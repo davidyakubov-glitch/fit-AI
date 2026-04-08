@@ -1,0 +1,53 @@
+{
+  "name": "WorkoutSession",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the workout was performed"
+    },
+    "exercise_type": {
+      "type": "string",
+      "enum": [
+        "squat",
+        "lunge",
+        "plank"
+      ],
+      "default": "squat",
+      "description": "Type of exercise performed"
+    },
+    "total_reps": {
+      "type": "number",
+      "description": "Total repetitions completed"
+    },
+    "good_reps": {
+      "type": "number",
+      "description": "Reps with good form"
+    },
+    "avg_depth_score": {
+      "type": "number",
+      "description": "Average depth score (0-100)"
+    },
+    "avg_form_score": {
+      "type": "number",
+      "description": "Average form score (0-100)"
+    },
+    "common_issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Common form issues detected"
+    },
+    "duration_seconds": {
+      "type": "number",
+      "description": "Workout duration in seconds"
+    }
+  },
+  "required": [
+    "date",
+    "exercise_type",
+    "total_reps"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "FoodItem",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the food item"
+    },
+    "serving_size": {
+      "type": "string",
+      "description": "Serving size (e.g., '100g', '1 cup')"
+    },
+    "calories": {
+      "type": "number",
+      "description": "Calories per serving"
+    },
+    "protein": {
+      "type": "number",
+      "description": "Protein in grams"
+    },
+    "carbs": {
+      "type": "number",
+      "description": "Carbohydrates in grams"
+    },
+    "fat": {
+      "type": "number",
+      "description": "Fat in grams"
+    },
+    "is_custom": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this is a custom user-created food"
+    }
+  },
+  "required": [
+    "name",
+    "calories"
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "name": "Challenge",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Challenge name"
+    },
+    "description": {
+      "type": "string",
+      "description": "What the challenge involves"
+    },
+    "challenge_type": {
+      "type": "string",
+      "enum": [
+        "reps",
+        "streak",
+        "duration"
+      ],
+      "default": "reps",
+      "description": "How the challenge is measured"
+    },
+    "exercise_name": {
+      "type": "string",
+      "description": "Which exercise (if applicable)"
+    },
+    "target_value": {
+      "type": "number",
+      "description": "Target reps, streak days, or minutes"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the challenge ends"
+    },
+    "entries": {
+      "type": "array",
+      "description": "Leaderboard entries",
+      "items": {
+        "type": "object",
+        "properties": {
+          "user_email": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "submitted_at": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "title",
+    "challenge_type",
+    "target_value"
+  ]
+}

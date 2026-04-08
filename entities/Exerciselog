@@ -1,0 +1,46 @@
+{
+  "name": "ExerciseLog",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the exercise was performed"
+    },
+    "exercise_name": {
+      "type": "string",
+      "description": "Name of the exercise"
+    },
+    "sets": {
+      "type": "number",
+      "description": "Number of sets completed"
+    },
+    "reps": {
+      "type": "number",
+      "description": "Reps per set (average or target)"
+    },
+    "weight": {
+      "type": "number",
+      "description": "Weight used in kg or lbs (0 for bodyweight)"
+    },
+    "duration_seconds": {
+      "type": "number",
+      "description": "Duration for timed exercises"
+    },
+    "is_personal_best": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this is a personal record"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Exercise notes or feelings"
+    }
+  },
+  "required": [
+    "date",
+    "exercise_name",
+    "sets",
+    "reps"
+  ]
+}

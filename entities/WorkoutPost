@@ -1,0 +1,91 @@
+{
+  "name": "WorkoutPost",
+  "type": "object",
+  "properties": {
+    "post_type": {
+      "type": "string",
+      "enum": [
+        "workout_summary",
+        "template_share",
+        "challenge_result"
+      ],
+      "default": "workout_summary",
+      "description": "Type of post"
+    },
+    "caption": {
+      "type": "string",
+      "description": "User's caption or message"
+    },
+    "workout_name": {
+      "type": "string",
+      "description": "Name of the workout or template"
+    },
+    "stats": {
+      "type": "object",
+      "description": "Workout stats snapshot",
+      "properties": {
+        "exercises_completed": {
+          "type": "number"
+        },
+        "total_reps": {
+          "type": "number"
+        },
+        "duration_seconds": {
+          "type": "number"
+        },
+        "difficulty": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string"
+        }
+      }
+    },
+    "template_exercises": {
+      "type": "array",
+      "description": "Exercises (for shared templates)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "exercise_name": {
+            "type": "string"
+          },
+          "sets": {
+            "type": "number"
+          },
+          "reps": {
+            "type": "string"
+          },
+          "rest_seconds": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "likes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of user emails who liked"
+    },
+    "privacy": {
+      "type": "string",
+      "enum": [
+        "public",
+        "friends",
+        "private"
+      ],
+      "default": "public",
+      "description": "Who can see this post"
+    },
+    "author_name": {
+      "type": "string",
+      "description": "Display name of author"
+    }
+  },
+  "required": [
+    "post_type",
+    "workout_name"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "Referral",
+  "type": "object",
+  "properties": {
+    "referrer_email": {
+      "type": "string",
+      "description": "Email of the user who referred"
+    },
+    "referred_email": {
+      "type": "string",
+      "description": "Email of the new user who signed up"
+    },
+    "referral_code": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed",
+        "paid"
+      ],
+      "default": "pending"
+    },
+    "commission_amount": {
+      "type": "number",
+      "default": 2,
+      "description": "Commission in USD"
+    },
+    "completed_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "referrer_email",
+    "referral_code"
+  ]
+}

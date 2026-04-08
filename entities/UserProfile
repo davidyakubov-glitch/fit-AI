@@ -1,0 +1,50 @@
+{
+  "name": "UserProfile",
+  "type": "object",
+  "properties": {
+    "streak_days": {
+      "type": "number",
+      "default": 0,
+      "description": "Current consecutive workout days"
+    },
+    "longest_streak": {
+      "type": "number",
+      "default": 0,
+      "description": "All-time longest streak"
+    },
+    "last_workout_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of last recorded workout"
+    },
+    "total_workouts": {
+      "type": "number",
+      "default": 0
+    },
+    "total_reps": {
+      "type": "number",
+      "default": 0
+    },
+    "achievements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Unlocked achievement IDs"
+    },
+    "referral_code": {
+      "type": "string",
+      "description": "Unique referral code for this user"
+    },
+    "referred_by": {
+      "type": "string",
+      "description": "Referral code used when signing up"
+    },
+    "referral_earnings": {
+      "type": "number",
+      "default": 0,
+      "description": "Total earnings from referrals in USD"
+    }
+  },
+  "required": []
+}

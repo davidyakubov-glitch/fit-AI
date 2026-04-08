@@ -1,0 +1,68 @@
+{
+  "name": "WorkoutPlan",
+  "type": "object",
+  "properties": {
+    "generated_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the plan was generated"
+    },
+    "difficulty_level": {
+      "type": "string",
+      "enum": [
+        "beginner",
+        "intermediate",
+        "advanced"
+      ],
+      "default": "beginner",
+      "description": "Current difficulty level"
+    },
+    "focus_areas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Areas to focus on based on performance"
+    },
+    "exercises": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "sets": {
+            "type": "number"
+          },
+          "reps": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Recommended exercises"
+    },
+    "tips": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Personalized tips"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this is the current active plan"
+    }
+  },
+  "required": [
+    "generated_date",
+    "difficulty_level"
+  ]
+}

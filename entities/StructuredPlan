@@ -1,0 +1,97 @@
+{
+  "name": "StructuredPlan",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Plan name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Plan description"
+    },
+    "goal": {
+      "type": "string",
+      "enum": [
+        "muscle_gain",
+        "weight_loss",
+        "endurance",
+        "strength",
+        "general"
+      ],
+      "description": "Primary fitness goal"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "beginner",
+        "intermediate",
+        "advanced"
+      ],
+      "default": "beginner"
+    },
+    "estimated_duration_minutes": {
+      "type": "number",
+      "description": "Estimated total plan duration in minutes"
+    },
+    "exercises": {
+      "type": "array",
+      "description": "Ordered list of exercises in the plan",
+      "items": {
+        "type": "object",
+        "properties": {
+          "exercise_id": {
+            "type": "string"
+          },
+          "exercise_name": {
+            "type": "string"
+          },
+          "sets": {
+            "type": "number"
+          },
+          "reps": {
+            "type": "string"
+          },
+          "rest_seconds": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "is_template": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, this is a preset/AI template; if false, it is a user's saved plan"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "preset",
+        "ai_generated",
+        "custom"
+      ],
+      "default": "custom"
+    },
+    "completed_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "If set, this is a completed plan log entry"
+    },
+    "total_reps_completed": {
+      "type": "number"
+    },
+    "exercises_completed": {
+      "type": "number"
+    },
+    "duration_seconds": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "name",
+    "exercises"
+  ]
+}
