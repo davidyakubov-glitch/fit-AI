@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Play, Square, RotateCcw, Sparkles, Lock, Info } from 'lucide-react';
+import { Play, Square, RotateCcw, Sparkles, Video, Info } from 'lucide-react'; // Заменили Lock на Video
 import { toast } from 'sonner';
 import StreakBanner from '../components/fitness/StreakBanner';
 import PoseDetector from '../components/fitness/PoseDetector';
@@ -13,7 +13,8 @@ import FeedbackDisplay from '../components/fitness/FeedbackDisplay';
 import FormIssuesPanel from '../components/fitness/FormIssuesPanel';
 import FormTipsCard from '../components/fitness/FormTipsCard';
 import AIWorkoutGenerator from '../components/fitness/AIWorkoutGenerator';
-import SubscriptionCard from '../components/fitness/SubscriptionCard';
+// Мы можем оставить импорт SubscriptionCard, но передадим туда true, либо позже удалим
+import SubscriptionCard from '../components/fitness/SubscriptionCard'; 
 import ExercisePicker from '../components/fitness/ExercisePicker';
 import ExerciseVideo from '../components/fitness/ExerciseVideo';
 import { getExercise } from '../components/fitness/exerciseDatabase';
@@ -155,7 +156,7 @@ export default function Workout() {
         {/* Header */}
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">AI Fitness Coach</h1>
-          <p className="text-gray-600">Real-time AI form analysis for any exercise</p>
+          <p className="text-gray-600">Free real-time AI form analysis for everyone</p>
         </div>
 
         {/* Streak Banner */}
@@ -225,8 +226,8 @@ export default function Workout() {
           </div>
         )}
 
-        {/* Subscription Card */}
-        {!isActive && <SubscriptionCard isSubscribed={false} />}
+        {/* Subscription Card - Теперь всегда показывает статус Free/Subscribed */}
+        {!isActive && <SubscriptionCard isSubscribed={true} />}
 
         {/* AI Workout Generator Toggle */}
         {!isActive && (
@@ -238,7 +239,7 @@ export default function Workout() {
               className="border-purple-300 hover:bg-purple-50 dark:border-purple-700 dark:hover:bg-purple-900"
             >
               <Sparkles className="h-4 w-4 mr-2" />
-              {showGenerator ? 'Hide' : 'Generate AI Workout'}
+              {showGenerator ? 'Hide' : 'Generate AI Workout (Free)'}
             </Button>
           </div>
         )}
@@ -305,7 +306,7 @@ export default function Workout() {
               className="bg-green-600 hover:bg-green-700"
             >
               <Play className="h-5 w-5 mr-2" />
-              Start Workout
+              Start Free Workout
             </Button>
           ) : (
             <>
@@ -349,25 +350,21 @@ export default function Workout() {
                   />
                 ) : (
                   <div className="w-full h-96 bg-gray-900 rounded-lg flex flex-col items-center justify-center gap-4 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-900/60 to-indigo-900/60" />
-                    <Lock className="h-10 w-10 text-purple-300 relative z-10" />
-                    <div className="text-center relative z-10">
-                      <p className="text-white font-semibold text-lg">Camera Feed Locked</p>
-                      <p className="text-purple-300 text-sm mt-1">
-                        Subscribe to $10/month to unlock live AI form analysis
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 to-blue-900/40" />
+                    <Video className="h-10 w-10 text-green-300 relative z-10" />
+                    <div className="text-center relative z-10 px-4">
+                      <p className="text-white font-semibold text-lg">AI Vision Ready</p>
+                      <p className="text-green-200 text-sm mt-1">
+                        AI form analysis is active and free for all users.
                       </p>
                     </div>
                     <Button
                       type="button"
-                      className="bg-purple-600 hover:bg-purple-700 relative z-10"
-                      onClick={() =>
-                        toast.info(
-                          'Enable backend functions in Dashboard → Settings to process payments.'
-                        )
-                      }
+                      className="bg-green-600 hover:bg-green-700 relative z-10"
+                      onClick={startWorkout}
                     >
                       <Sparkles className="h-4 w-4 mr-2" />
-                      Unlock for $10/month
+                      Activate Free AI Analysis
                     </Button>
                   </div>
                 )}
@@ -423,7 +420,7 @@ export default function Workout() {
                   Position so your <strong>full body</strong> is visible (
                   {selectedExercise?.cameraAngle || 'side view'})
                 </li>
-                <li>Click "Start Workout" and begin moving</li>
+                <li>Click "Start Free Workout" and begin moving</li>
                 <li>Follow real-time feedback to improve form</li>
                 <li>Click "Stop & Save" to record your session</li>
               </ol>
