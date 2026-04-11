@@ -2,27 +2,44 @@ import { useState } from "react";
 import { ArrowLeft, Mail, Lock, User } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { registerUser, loginUser } from "../lib/auth";
+import {
+  registerUser,
+  loginUser,
+} from "../lib/auth";
 
 export default function Auth({ onLoginSuccess }) {
-  const [mode, setMode] = useState("login"); // login | signup | reset
+  const [mode, setMode] = useState("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const resetFormState = () => {
+    setPassword("");
+    setConfirmPassword("");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const trimmedEmail = email.trim();
+    const trimmedName = name.trim();
 
     try {
       setLoading(true);
 
-      if (!email) {
+      if (!trimmedEmail) {
         alert("Enter email");
         return;
       }
 
       if (mode === "signup") {
+        if (!trimmedName) {
+          alert("Enter your name");
+          return;
+        }
+
         if (!password) {
           alert("Enter password");
           return;
@@ -33,39 +50,50 @@ export default function Auth({ onLoginSuccess }) {
           return;
         }
 
-        if (password !== confirmPassword) {
+        if (password.trim() !== confirmPassword.trim()) {
           alert("Passwords do not match");
           return;
         }
 
-        const user = await registerUser(email, password);
+        const user = await registerUser(trimmedEmail, password, trimmedName);
         alert("Account created successfully");
+        resetFormState();
 
         if (onLoginSuccess) {
           onLoginSuccess(user);
         }
-      }
-
-      if (mode === "login") {
+      } else if (mode === "login") {
         if (!password) {
           alert("Enter password");
           return;
         }
 
-        const user = await loginUser(email, password);
+        const user = await loginUser(trimmedEmail, password);
         alert("Signed in successfully");
+        resetFormState();
 
         if (onLoginSuccess) {
           onLoginSuccess(user);
         }
-      }
-
-      if (mode === "reset") {
+      } else if (mode === "reset") {
+      
         alert("Password reset is not connected yet");
+        setMode("login");
       }
     } catch (error) {
       console.error(error);
-      alert(error.message || "Something went wrong");
+
+      if (error?.code === "auth/invalid-credential") {
+        alert("Invalid email or password");
+      } else if (error?.code === "auth/email-already-in-use") {
+        alert("This email is already in use");
+      } else if (error?.code === "auth/user-not-found") {
+        alert("User not found");
+      } else if (error?.code === "auth/invalid-email") {
+        alert("Invalid email address");
+      } else {
+        alert(error?.message || "Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
@@ -81,6 +109,7 @@ export default function Auth({ onLoginSuccess }) {
               {mode === "signup" && "Create Account"}
               {mode === "reset" && "Reset Password"}
             </CardTitle>
+
             <p className="text-sm text-gray-500">
               {mode === "login" && "Welcome back"}
               {mode === "signup" && "Create your FitAI account"}
@@ -101,6 +130,9 @@ export default function Auth({ onLoginSuccess }) {
                       type="text"
                       placeholder="Your name"
                       className="w-full outline-none bg-transparent"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      autoComplete="name"
                     />
                   </div>
                 </div>
@@ -118,13 +150,14 @@ export default function Auth({ onLoginSuccess }) {
                     className="w-full outline-none bg-transparent"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
                   />
                 </div>
               </div>
 
               {mode !== "reset" && (
                 <div>
-<label className="block text-sm font-medium mb-2 text-gray-700">
+                  <label className="block text-sm font-medium mb-2 text-gray-700">
                     Password
                   </label>
                   <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white">
@@ -135,6 +168,9 @@ export default function Auth({ onLoginSuccess }) {
                       className="w-full outline-none bg-transparent"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      autoComplete={
+                        mode === "login" ? "current-password" : "new-password"
+                      }
                     />
                   </div>
                 </div>
@@ -153,6 +189,7 @@ export default function Auth({ onLoginSuccess }) {
                       className="w-full outline-none bg-transparent"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
                     />
                   </div>
                 </div>
@@ -192,7 +229,8 @@ export default function Auth({ onLoginSuccess }) {
                   onClick={() => setMode("login")}
                   className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-gray-700"
                 >
-                  <ArrowLeft className="h-4 w-4" /> Back to Sign In
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Sign In
                 </button>
               ) : (
                 <p className="text-center text-sm text-gray-500">
@@ -201,9 +239,7 @@ export default function Auth({ onLoginSuccess }) {
                     : "Already have an account?"}{" "}
                   <button
                     type="button"
-                    onClick={() =>
-                      setMode(mode === "login" ? "signup" : "login")
-                    }
+                    onClick={() => setMode(mode === "login" ? "signup" : "login")}
                     className="text-purple-600 font-semibold hover:underline"
                   >
                     {mode === "login" ? "Sign up free" : "Sign in"}
@@ -213,10 +249,6 @@ export default function Auth({ onLoginSuccess }) {
             </form>
           </CardContent>
         </Card>
-
-        <div className="text-center mt-4 text-sm text-gray-400">
-          Continue as guest (limited features)
-        </div>
       </div>
     </div>
   );

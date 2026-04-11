@@ -1,20 +1,45 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-  PieChart, Pie, Cell
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 import {
-  TrendingUp, Award, Target, Calendar, Loader2,
-  Scale, Plus, Dumbbell, Trophy, Activity
+  TrendingUp,
+  Award,
+  Target,
+  Calendar,
+  Loader2,
+  Scale,
+  Plus,
+  Dumbbell,
+  Trophy,
+  Activity,
 } from 'lucide-react';
 import { format, subDays, isAfter } from 'date-fns';
+
 import BodyMeasurementForm from '../components/fitness/BodyMeasurementForm';
 import MobileHeader from '../components/MobileHeader';
 import PullToRefresh from '../components/PullToRefresh';
@@ -22,6 +47,7 @@ import ProgressFilters from '../components/progress/ProgressFilters';
 import StatCard from '../components/progress/StatCard';
 import FocusAreas from '../components/progress/FocusAreas';
 import AchievementsPanel from '../components/fitness/AchievementsPanel';
+import { useAuthUser } from '../lib/useAuthUser';
 
 const GOOD_REP_COLORS = ['#9333ea', '#e5e7eb'];
 
@@ -29,146 +55,213 @@ export default function Progress() {
   const [showMeasurementForm, setShowMeasurementForm] = useState(false);
   const [dateRange, setDateRange] = useState(30);
   const [exerciseFilter, setExerciseFilter] = useState('All');
-  const queryClient = useQueryClient();
 
-  const { data: user } = useQuery({
-    queryKey: ['user'],
-    queryFn: () => base44.auth.me()
-  });
+  const queryClient = useQueryClient();
+  const user = useAuthUser();
 
   const { data: profiles = [] } = useQuery({
     queryKey: ['userProfile', user?.email],
-    queryFn: () => base44.entities.UserProfile.filter({ created_by: user.email }, '-created_date', 1),
-    enabled: !!user
+    queryFn: () =>
+      base44.entities.UserProfile.filter(
+        { created_by: user.email },
+        '-created_date',
+        1
+      ),
+    enabled: !!user?.email,
   });
+
   const userProfile = profiles[0] || null;
 
-  const { data: sessions = [], isLoading } = useQuery({
+  const { data: sessions = [], isLoading: sessionsLoading } = useQuery({
     queryKey: ['allSessions', user?.email],
-    queryFn: () => base44.entities.WorkoutSession.filter({ created_by: user.email }, '-date', 100),
-    enabled: !!user
+    queryFn: () =>
+      base44.entities.WorkoutSession.filter(
+        { created_by: user.email },
+        '-date',
+        100
+      ),
+    enabled: !!user?.email,
   });
 
   const { data: measurements = [], isLoading: measurementsLoading } = useQuery({
     queryKey: ['bodyMeasurements', user?.email],
-    queryFn: () => base44.entities.BodyMeasurement.filter({ created_by: user.email }, '-date', 50),
-    enabled: !!user
+    queryFn: () =>
+      base44.entities.BodyMeasurement.filter(
+        { created_by: user.email },
+        '-date',
+        50
+      ),
+    enabled: !!user?.email,
   });
 
   const { data: exerciseLogs = [], isLoading: logsLoading } = useQuery({
     queryKey: ['exerciseLogs', user?.email],
-    queryFn: () => base44.entities.ExerciseLog.filter({ created_by: user.email }, '-date', 100),
-    enabled: !!user
+    queryFn: () =>
+      base44.entities.ExerciseLog.filter(
+        { created_by: user.email },
+        '-date',
+        100
+      ),
+    enabled: !!user?.email,
   });
 
-  // Apply filters
   const filteredSessions = useMemo(() => {
     let result = sessions;
+
     if (dateRange > 0) {
       const cutoff = subDays(new Date(), dateRange);
-      result = result.filter(s => isAfter(new Date(s.date), cutoff));
+      result = result.filter((s) => s?.date && isAfter(new Date(s.date), cutoff));
     }
+
     if (exerciseFilter !== 'All') {
-      result = result.filter(s => s.exercise_type === exerciseFilter);
+      result = result.filter((s) => s.exercise_type === exerciseFilter);
     }
+
     return result;
   }, [sessions, dateRange, exerciseFilter]);
 
   const handleRefresh = async () => {
     await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['userProfile'] }),
       queryClient.invalidateQueries({ queryKey: ['allSessions'] }),
       queryClient.invalidateQueries({ queryKey: ['bodyMeasurements'] }),
-      queryClient.invalidateQueries({ queryKey: ['exerciseLogs'] })
+      queryClient.invalidateQueries({ queryKey: ['exerciseLogs'] }),
     ]);
   };
 
-  if (!user) return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="max-w-md w-full">
-        <CardContent className="pt-6 text-center">
-          <p className="text-gray-600">Please log in to view your progress</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  if (user === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+      </div>
+    );
+  }
 
-  if (isLoading || measurementsLoading || logsLoading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-    </div>
-  );
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-6 text-center">
+            <p className="text-gray-600">Please log in to view your progress</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  // Stats computed from filtered sessions
+  if (sessionsLoading || measurementsLoading || logsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+      </div>
+    );
+  }
+
   const totalWorkouts = filteredSessions.length;
-  const totalReps = filteredSessions.reduce((s, x) => s + (x.total_reps || 0), 0);
-  const totalGoodReps = filteredSessions.reduce((s, x) => s + (x.good_reps || 0), 0);
-  const avgFormScore = totalWorkouts
-    ? Math.round(filteredSessions.reduce((s, x) => s + (x.avg_form_score || 0), 0) / totalWorkouts)
-    : 0;
-  const avgDepth = totalWorkouts
-    ? Math.round(filteredSessions.reduce((s, x) => s + (x.avg_depth_score || 0), 0) / totalWorkouts)
-    : 0;
-  const totalDuration = Math.round(
-    filteredSessions.reduce((s, x) => s + (x.duration_seconds || 0), 0) / 60
+  const totalReps = filteredSessions.reduce((sum, item) => sum + (item.total_reps || 0), 0);
+  const totalGoodReps = filteredSessions.reduce(
+    (sum, item) => sum + (item.good_reps || 0),
+    0
   );
+
+  const avgFormScore = totalWorkouts
+    ? Math.round(
+        filteredSessions.reduce(
+          (sum, item) => sum + (item.avg_form_score || 0),
+          0
+        ) / totalWorkouts
+      )
+    : 0;
+
+  const avgDepth = totalWorkouts
+    ? Math.round(
+        filteredSessions.reduce(
+          (sum, item) => sum + (item.avg_depth_score || 0),
+          0
+        ) / totalWorkouts
+      )
+    : 0;
+
+  const totalDuration = Math.round(
+    filteredSessions.reduce(
+      (sum, item) => sum + (item.duration_seconds || 0),
+      0
+    ) / 60
+  );
+
   const goodRepPct = totalReps > 0 ? Math.round((totalGoodReps / totalReps) * 100) : 0;
 
-  // Trend: compare first half vs second half of filtered sessions
   const half = Math.floor(filteredSessions.length / 2);
   const firstHalf = filteredSessions.slice(half);
   const secondHalf = filteredSessions.slice(0, half);
-  const formTrend = firstHalf.length && secondHalf.length
-    ? (secondHalf.reduce((s, x) => s + (x.avg_form_score || 0), 0) / secondHalf.length) -
-      (firstHalf.reduce((s, x) => s + (x.avg_form_score || 0), 0) / firstHalf.length)
-    : null;
 
-  // Chart data (oldest first)
-  const chartData = [...filteredSessions].reverse().map((s) => ({
-    date: format(new Date(s.date), 'MMM d'),
-    form: s.avg_form_score || 0,
-    depth: s.avg_depth_score || 0,
-    reps: s.total_reps || 0,
-    goodReps: s.good_reps || 0,
-    duration: s.duration_seconds ? Math.round(s.duration_seconds / 60) : 0
+  const formTrend =
+    firstHalf.length && secondHalf.length
+      ? secondHalf.reduce((sum, item) => sum + (item.avg_form_score || 0), 0) /
+          secondHalf.length -
+        firstHalf.reduce((sum, item) => sum + (item.avg_form_score || 0), 0) /
+          firstHalf.length
+      : null;
+
+  const chartData = [...filteredSessions].reverse().map((session) => ({
+    date: session?.date ? format(new Date(session.date), 'MMM d') : '—',
+    form: session.avg_form_score || 0,
+    depth: session.avg_depth_score || 0,
+    reps: session.total_reps || 0,
+    goodReps: session.good_reps || 0,
+    duration: session.duration_seconds
+      ? Math.round(session.duration_seconds / 60)
+      : 0,
   }));
 
-  // Good reps donut
   const pieData = [
     { name: 'Good Form', value: totalGoodReps },
-    { name: 'Needs Work', value: totalReps - totalGoodReps }
+    { name: 'Needs Work', value: Math.max(0, totalReps - totalGoodReps) },
   ];
 
-  // Body measurement chart
-  const measurementChartData = [...measurements].reverse().map(m => ({
-    date: format(new Date(m.date), 'MMM d'),
-    weight: m.weight,
-    bodyFat: m.body_fat_percentage,
-    muscleMass: m.muscle_mass
+  const measurementChartData = [...measurements].reverse().map((measurement) => ({
+    date: measurement?.date ? format(new Date(measurement.date), 'MMM d') : '—',
+    weight: measurement.weight || 0,
+    bodyFat: measurement.body_fat_percentage || 0,
+    muscleMass: measurement.muscle_mass || 0,
   }));
 
-  // Exercise stats
   const exerciseStats = exerciseLogs.reduce((acc, log) => {
-    const name = log.exercise_name;
-    if (!acc[name]) acc[name] = { name, maxWeight: 0, maxReps: 0, totalSets: 0, count: 0 };
+    const name = log.exercise_name || 'Unknown Exercise';
+
+    if (!acc[name]) {
+      acc[name] = {
+        name,
+        maxWeight: 0,
+        maxReps: 0,
+        totalSets: 0,
+        count: 0,
+      };
+    }
+
     acc[name].maxWeight = Math.max(acc[name].maxWeight, log.weight || 0);
     acc[name].maxReps = Math.max(acc[name].maxReps, log.reps || 0);
     acc[name].totalSets += log.sets || 0;
     acc[name].count += 1;
+
     return acc;
   }, {});
 
-  const personalBests = exerciseLogs.filter(log => log.is_personal_best);
+  const personalBests = exerciseLogs.filter((log) => log.is_personal_best);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
       <MobileHeader title="Progress Dashboard" />
+
       <PullToRefresh onRefresh={handleRefresh}>
         <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
-
-          {/* Header */}
           <div className="hidden md:block text-center">
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-1">Progress Dashboard</h1>
-            <p className="text-gray-500 dark:text-gray-400">Visualize your fitness journey over time</p>
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+              Progress Dashboard
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400">
+              Visualize your fitness journey over time
+            </p>
           </div>
 
           <Tabs defaultValue="workouts" className="w-full">
@@ -179,10 +272,7 @@ export default function Progress() {
               <TabsTrigger value="achievements">🏆</TabsTrigger>
             </TabsList>
 
-            {/* ── WORKOUTS TAB ── */}
             <TabsContent value="workouts" className="space-y-6 mt-6">
-
-              {/* Filters */}
               <ProgressFilters
                 dateRange={dateRange}
                 setDateRange={setDateRange}
@@ -194,32 +284,81 @@ export default function Progress() {
                 <Card>
                   <CardContent className="pt-10 pb-10 text-center">
                     <Target className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">No sessions found</h3>
-                    <p className="text-gray-500 text-sm mt-1">Try a different date range or exercise filter.</p>
+                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                      No sessions found
+                    </h3>
+                    <p className="text-gray-500 text-sm mt-1">
+                      Try a different date range or exercise filter.
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
                 <>
-                  {/* Stat Cards */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard label="Total Workouts" value={totalWorkouts} icon={Calendar} color="purple" />
-                    <StatCard label="Total Reps" value={totalReps} icon={TrendingUp} color="green" />
-                    <StatCard label="Good Rep Rate" value={goodRepPct} unit="%" icon={Award} color="blue" />
-                    <StatCard label="Avg Form Score" value={avgFormScore} unit="%" icon={Target} color="orange" trend={formTrend} />
+                    <StatCard
+                      label="Total Workouts"
+                      value={totalWorkouts}
+                      icon={Calendar}
+                      color="purple"
+                    />
+                    <StatCard
+                      label="Total Reps"
+                      value={totalReps}
+                      icon={TrendingUp}
+                      color="green"
+                    />
+                    <StatCard
+                      label="Good Rep Rate"
+                      value={goodRepPct}
+                      unit="%"
+                      icon={Award}
+                      color="blue"
+                    />
+                    <StatCard
+                      label="Avg Form Score"
+                      value={avgFormScore}
+                      unit="%"
+                      icon={Target}
+                      color="orange"
+                      trend={formTrend}
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard label="Avg Squat Depth" value={avgDepth} unit="%" icon={Activity} color="purple" />
-                    <StatCard label="Total Duration" value={totalDuration} unit="min" icon={Calendar} color="blue" />
-                    <StatCard label="Good Reps" value={totalGoodReps} icon={Award} color="green" />
-                    <StatCard label="Sessions Logged" value={totalWorkouts} icon={Dumbbell} color="orange" />
+                    <StatCard
+                      label="Avg Squat Depth"
+                      value={avgDepth}
+                      unit="%"
+                      icon={Activity}
+                      color="purple"
+                    />
+                    <StatCard
+                      label="Total Duration"
+                      value={totalDuration}
+                      unit="min"
+                      icon={Calendar}
+                      color="blue"
+                    />
+                    <StatCard
+                      label="Good Reps"
+                      value={totalGoodReps}
+                      icon={Award}
+                      color="green"
+                    />
+                    <StatCard
+                      label="Sessions Logged"
+                      value={totalWorkouts}
+                      icon={Dumbbell}
+                      color="orange"
+                    />
                   </div>
 
-                  {/* Form & Depth Chart */}
                   <Card>
                     <CardHeader>
                       <CardTitle>Form Score & Squat Depth Over Time</CardTitle>
-                      <CardDescription>Track how your technique improves session to session</CardDescription>
+                      <CardDescription>
+                        Track how your technique improves session to session
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={280}>
@@ -227,16 +366,29 @@ export default function Progress() {
                           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                           <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                           <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 11 }} />
-                          <Tooltip formatter={(v) => `${v}%`} />
+                          <Tooltip formatter={(value) => `${value}%`} />
                           <Legend />
-                          <Line type="monotone" dataKey="form" stroke="#9333ea" strokeWidth={2.5} dot={false} name="Form Score %" />
-                          <Line type="monotone" dataKey="depth" stroke="#2563eb" strokeWidth={2.5} dot={false} name="Depth %" />
+                          <Line
+                            type="monotone"
+                            dataKey="form"
+                            stroke="#9333ea"
+                            strokeWidth={2.5}
+                            dot={false}
+                            name="Form Score %"
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="depth"
+                            stroke="#2563eb"
+                            strokeWidth={2.5}
+                            dot={false}
+                            name="Depth %"
+                          />
                         </LineChart>
                       </ResponsiveContainer>
                     </CardContent>
                   </Card>
 
-                  {/* Reps Chart + Good Rep Donut */}
                   <div className="grid md:grid-cols-2 gap-6">
                     <Card>
                       <CardHeader>
@@ -251,8 +403,18 @@ export default function Progress() {
                             <YAxis tick={{ fontSize: 11 }} />
                             <Tooltip />
                             <Legend />
-                            <Bar dataKey="reps" fill="#d8b4fe" name="Total Reps" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="goodReps" fill="#7c3aed" name="Good Form Reps" radius={[4, 4, 0, 0]} />
+                            <Bar
+                              dataKey="reps"
+                              fill="#d8b4fe"
+                              name="Total Reps"
+                              radius={[4, 4, 0, 0]}
+                            />
+                            <Bar
+                              dataKey="goodReps"
+                              fill="#7c3aed"
+                              name="Good Form Reps"
+                              radius={[4, 4, 0, 0]}
+                            />
                           </BarChart>
                         </ResponsiveContainer>
                       </CardContent>
@@ -261,7 +423,9 @@ export default function Progress() {
                     <Card>
                       <CardHeader>
                         <CardTitle>Good Rep Breakdown</CardTitle>
-                        <CardDescription>{goodRepPct}% of reps with good form</CardDescription>
+                        <CardDescription>
+                          {goodRepPct}% of reps with good form
+                        </CardDescription>
                       </CardHeader>
                       <CardContent className="flex flex-col items-center justify-center h-[250px]">
                         <ResponsiveContainer width="100%" height={200}>
@@ -275,8 +439,8 @@ export default function Progress() {
                               paddingAngle={4}
                               dataKey="value"
                             >
-                              {pieData.map((_, i) => (
-                                <Cell key={i} fill={GOOD_REP_COLORS[i]} />
+                              {pieData.map((_, index) => (
+                                <Cell key={index} fill={GOOD_REP_COLORS[index]} />
                               ))}
                             </Pie>
                             <Tooltip />
@@ -287,7 +451,6 @@ export default function Progress() {
                     </Card>
                   </div>
 
-                  {/* Duration Chart */}
                   <Card>
                     <CardHeader>
                       <CardTitle>Workout Duration</CardTitle>
@@ -299,39 +462,58 @@ export default function Progress() {
                           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                           <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                           <YAxis unit="m" tick={{ fontSize: 11 }} />
-                          <Tooltip formatter={(v) => `${v} min`} />
-                          <Bar dataKey="duration" fill="#06b6d4" name="Duration (min)" radius={[4, 4, 0, 0]} />
+                          <Tooltip formatter={(value) => `${value} min`} />
+                          <Bar
+                            dataKey="duration"
+                            fill="#06b6d4"
+                            name="Duration (min)"
+                            radius={[4, 4, 0, 0]}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </CardContent>
                   </Card>
 
-                  {/* Focus Areas */}
                   <FocusAreas sessions={filteredSessions} />
 
-                  {/* Recent Workouts Table */}
                   <Card>
                     <CardHeader>
                       <CardTitle>Recent Sessions</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
-                        {filteredSessions.slice(0, 8).map(session => (
-                          <div key={session.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                        {filteredSessions.slice(0, 8).map((session) => (
+                          <div
+                            key={session.id}
+                            className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          >
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-                                  {format(new Date(session.date), 'MMM d, yyyy')}
+                                  {session?.date
+                                    ? format(new Date(session.date), 'MMM d, yyyy')
+                                    : '—'}
                                 </span>
-                                <Badge variant="secondary" className="text-xs capitalize">{session.exercise_type}</Badge>
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs capitalize"
+                                >
+                                  {session.exercise_type || 'workout'}
+                                </Badge>
                               </div>
                               <div className="text-xs text-gray-500 mt-0.5">
-                                {session.total_reps} reps · {session.good_reps} good · {Math.round((session.duration_seconds || 0) / 60)}min
+                                {(session.total_reps || 0)} reps ·{' '}
+                                {(session.good_reps || 0)} good ·{' '}
+                                {Math.round((session.duration_seconds || 0) / 60)}min
                               </div>
                             </div>
                             <div className="text-right text-sm">
-                              <div className="font-medium text-purple-600">{session.avg_form_score}% form</div>
-                              <div className="font-medium text-blue-600">{session.avg_depth_score}% depth</div>
+                              <div className="font-medium text-purple-600">
+                                {session.avg_form_score || 0}% form
+                              </div>
+                              <div className="font-medium text-blue-600">
+                                {session.avg_depth_score || 0}% depth
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -342,7 +524,6 @@ export default function Progress() {
               )}
             </TabsContent>
 
-            {/* ── BODY METRICS TAB ── */}
             <TabsContent value="body" className="space-y-6 mt-6">
               {showMeasurementForm ? (
                 <BodyMeasurementForm onClose={() => setShowMeasurementForm(false)} />
@@ -352,9 +533,15 @@ export default function Progress() {
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle>Body Measurements</CardTitle>
-                        <CardDescription>Track your body composition over time</CardDescription>
+                        <CardDescription>
+                          Track your body composition over time
+                        </CardDescription>
                       </div>
-                      <Button onClick={() => setShowMeasurementForm(true)} className="bg-purple-600 hover:bg-purple-700">
+                      <Button
+                        type="button"
+                        onClick={() => setShowMeasurementForm(true)}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
                         <Plus className="h-4 w-4 mr-2" />
                         Log Measurement
                       </Button>
@@ -366,20 +553,49 @@ export default function Progress() {
               {measurements.length > 0 && (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard label="Current Weight" value={measurements[0].weight} icon={Scale} color="purple" />
+                    <StatCard
+                      label="Current Weight"
+                      value={measurements[0].weight || 0}
+                      icon={Scale}
+                      color="purple"
+                    />
+
                     {measurements[0].body_fat_percentage && (
-                      <StatCard label="Body Fat" value={measurements[0].body_fat_percentage} unit="%" icon={Target} color="blue" />
+                      <StatCard
+                        label="Body Fat"
+                        value={measurements[0].body_fat_percentage}
+                        unit="%"
+                        icon={Target}
+                        color="blue"
+                      />
                     )}
+
                     {measurements[0].muscle_mass && (
-                      <StatCard label="Muscle Mass" value={measurements[0].muscle_mass} icon={Dumbbell} color="green" />
+                      <StatCard
+                        label="Muscle Mass"
+                        value={measurements[0].muscle_mass}
+                        icon={Dumbbell}
+                        color="green"
+                      />
                     )}
+
                     {measurements.length > 1 && (
                       <StatCard
                         label="Weight Change"
-                        value={Math.abs((measurements[0].weight - measurements[measurements.length - 1].weight).toFixed(1))}
+                        value={Math.abs(
+                          Number(
+                            (
+                              (measurements[0].weight || 0) -
+                              (measurements[measurements.length - 1].weight || 0)
+                            ).toFixed(1)
+                          )
+                        )}
                         icon={TrendingUp}
                         color="orange"
-                        trend={measurements[0].weight - measurements[measurements.length - 1].weight}
+                        trend={
+                          (measurements[0].weight || 0) -
+                          (measurements[measurements.length - 1].weight || 0)
+                        }
                       />
                     )}
                   </div>
@@ -397,9 +613,23 @@ export default function Progress() {
                             <YAxis />
                             <Tooltip />
                             <Legend />
-                            <Line type="monotone" dataKey="weight" stroke="#9333ea" strokeWidth={2} name="Weight" dot={false} />
-                            {measurementChartData.some(d => d.bodyFat) && (
-                              <Line type="monotone" dataKey="bodyFat" stroke="#2563eb" strokeWidth={2} name="Body Fat %" dot={false} />
+                            <Line
+                              type="monotone"
+                              dataKey="weight"
+                              stroke="#9333ea"
+                              strokeWidth={2}
+                              name="Weight"
+                              dot={false}
+                            />
+                            {measurementChartData.some((d) => d.bodyFat > 0) && (
+                              <Line
+                                type="monotone"
+                                dataKey="bodyFat"
+                                stroke="#2563eb"
+                                strokeWidth={2}
+                                name="Body Fat %"
+                                dot={false}
+                              />
                             )}
                           </LineChart>
                         </ResponsiveContainer>
@@ -408,17 +638,27 @@ export default function Progress() {
                   )}
 
                   <Card>
-                    <CardHeader><CardTitle>Measurement History</CardTitle></CardHeader>
+                    <CardHeader>
+                      <CardTitle>Measurement History</CardTitle>
+                    </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
-                        {measurements.slice(0, 10).map(m => (
-                          <div key={m.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        {measurements.slice(0, 10).map((measurement) => (
+                          <div
+                            key={measurement.id}
+                            className="flex items-center justify-between p-3 border rounded-lg"
+                          >
                             <div>
-                              <div className="font-semibold text-sm">{format(new Date(m.date), 'MMM d, yyyy')}</div>
+                              <div className="font-semibold text-sm">
+                                {measurement?.date
+                                  ? format(new Date(measurement.date), 'MMM d, yyyy')
+                                  : '—'}
+                              </div>
                               <div className="text-xs text-gray-500 mt-0.5">
-                                Weight: {m.weight}
-                                {m.body_fat_percentage && ` · Body Fat: ${m.body_fat_percentage}%`}
-                                {m.waist && ` · Waist: ${m.waist}`}
+                                Weight: {measurement.weight || 0}
+                                {measurement.body_fat_percentage &&
+                                  ` · Body Fat: ${measurement.body_fat_percentage}%`}
+                                {measurement.waist && ` · Waist: ${measurement.waist}`}
                               </div>
                             </div>
                           </div>
@@ -433,17 +673,25 @@ export default function Progress() {
                 <Card>
                   <CardContent className="pt-10 pb-10 text-center">
                     <Scale className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-700">No Measurements Yet</h3>
-                    <p className="text-gray-500 text-sm mb-4">Start tracking your body composition</p>
-                    <Button onClick={() => setShowMeasurementForm(true)} className="bg-purple-600 hover:bg-purple-700">
-                      <Plus className="h-4 w-4 mr-2" />Log First Measurement
+                    <h3 className="text-lg font-semibold text-gray-700">
+                      No Measurements Yet
+                    </h3>
+                    <p className="text-gray-500 text-sm mb-4">
+                      Start tracking your body composition
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => setShowMeasurementForm(true)}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Log First Measurement
                     </Button>
                   </CardContent>
                 </Card>
               )}
             </TabsContent>
 
-            {/* ── EXERCISES TAB ── */}
             <TabsContent value="exercises" className="space-y-6 mt-6">
               {personalBests.length > 0 && (
                 <Card className="border-yellow-200 bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-900/10 dark:to-gray-800">
@@ -455,14 +703,24 @@ export default function Progress() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-2">
-                      {personalBests.slice(0, 5).map(log => (
-                        <div key={log.id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-yellow-200 rounded-lg">
+                      {personalBests.slice(0, 5).map((log) => (
+                        <div
+                          key={log.id}
+                          className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-yellow-200 rounded-lg"
+                        >
                           <div>
-                            <div className="font-semibold text-sm">{log.exercise_name}</div>
-                            <div className="text-xs text-gray-500">{format(new Date(log.date), 'MMM d, yyyy')}</div>
+                            <div className="font-semibold text-sm">
+                              {log.exercise_name || 'Exercise'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {log?.date
+                                ? format(new Date(log.date), 'MMM d, yyyy')
+                                : '—'}
+                            </div>
                           </div>
                           <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                            {log.sets}×{log.reps}{log.weight > 0 ? ` @ ${log.weight}kg` : ''}
+                            {log.sets || 0}×{log.reps || 0}
+                            {(log.weight || 0) > 0 ? ` @ ${log.weight}kg` : ''}
                           </Badge>
                         </div>
                       ))}
@@ -479,15 +737,26 @@ export default function Progress() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {Object.values(exerciseStats).map(stat => (
-                        <div key={stat.name} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      {Object.values(exerciseStats).map((stat) => (
+                        <div
+                          key={stat.name}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
                           <div>
                             <div className="font-semibold text-sm">{stat.name}</div>
-                            <div className="text-xs text-gray-500">{stat.count} sessions · {stat.totalSets} total sets</div>
+                            <div className="text-xs text-gray-500">
+                              {stat.count} sessions · {stat.totalSets} total sets
+                            </div>
                           </div>
                           <div className="text-right text-sm">
-                            <div className="font-medium text-purple-600">Max {stat.maxReps} reps</div>
-                            {stat.maxWeight > 0 && <div className="font-medium text-blue-600">{stat.maxWeight}kg</div>}
+                            <div className="font-medium text-purple-600">
+                              Max {stat.maxReps} reps
+                            </div>
+                            {stat.maxWeight > 0 && (
+                              <div className="font-medium text-blue-600">
+                                {stat.maxWeight}kg
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -498,35 +767,45 @@ export default function Progress() {
                 <Card>
                   <CardContent className="pt-10 pb-10 text-center">
                     <Dumbbell className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-700">No Exercise Logs Yet</h3>
-                    <p className="text-gray-500 text-sm">Log individual exercises to track performance here</p>
+                    <h3 className="text-lg font-semibold text-gray-700">
+                      No Exercise Logs Yet
+                    </h3>
+                    <p className="text-gray-500 text-sm">
+                      Log individual exercises to track performance here
+                    </p>
                   </CardContent>
                 </Card>
               )}
             </TabsContent>
-            {/* ── ACHIEVEMENTS TAB ── */}
+
             <TabsContent value="achievements" className="space-y-6 mt-6">
               <div className="text-center mb-2">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Achievements</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  Achievements
+                </h2>
                 <p className="text-gray-500 text-sm">
                   {userProfile?.achievements?.length || 0} / 8 unlocked
                 </p>
               </div>
 
-              {/* Streak highlight */}
               {userProfile && (
                 <div className="grid grid-cols-2 gap-4">
                   <Card className="bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200">
                     <CardContent className="pt-4 pb-4 text-center">
                       <div className="text-3xl mb-1">🔥</div>
-                      <div className="text-2xl font-black text-orange-700">{userProfile.streak_days || 0}</div>
+                      <div className="text-2xl font-black text-orange-700">
+                        {userProfile.streak_days || 0}
+                      </div>
                       <div className="text-xs text-orange-500">Current Streak</div>
                     </CardContent>
                   </Card>
+
                   <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
                     <CardContent className="pt-4 pb-4 text-center">
                       <div className="text-3xl mb-1">⚡</div>
-                      <div className="text-2xl font-black text-purple-700">{userProfile.longest_streak || 0}</div>
+                      <div className="text-2xl font-black text-purple-700">
+                        {userProfile.longest_streak || 0}
+                      </div>
                       <div className="text-xs text-purple-500">Best Streak</div>
                     </CardContent>
                   </Card>

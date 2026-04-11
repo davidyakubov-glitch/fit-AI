@@ -4,7 +4,13 @@ import { createPageUrl } from '@/utils';
 import { Brain, Target, ShieldCheck, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const Section = ({ icon: Icon, title, children, iconColor = 'text-purple-600', iconBg = 'bg-purple-100' }) => (
+const Section = ({
+  icon: Icon,
+  title,
+  children,
+  iconColor = 'text-purple-600',
+  iconBg = 'bg-purple-100',
+}) => (
   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
     <div className="flex items-center gap-3 mb-4">
       <div className={`${iconBg} p-2.5 rounded-xl`}>
@@ -28,7 +34,10 @@ export default function AboutAICoach() {
     <div className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-gray-50">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center gap-3">
-        <Link to={createPageUrl('Settings')} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+        <Link
+          to={createPageUrl('Settings')}
+          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+        >
           <ArrowLeft className="h-5 w-5 text-gray-600" />
         </Link>
         <span className="font-semibold text-gray-800 text-base">About AI Coach</span>
@@ -40,34 +49,50 @@ export default function AboutAICoach() {
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-500 rounded-3xl shadow-lg mb-4">
             <Brain className="h-10 w-10 text-white" />
           </div>
-          <h1 className="text-2xl font-extrabold text-gray-900 mb-2">About Your AI Fitness Coach</h1>
-          <p className="text-gray-500 text-sm">Powered by advanced AI technology</p>
+          <h1 className="text-2xl font-extrabold text-gray-900 mb-2">
+            About Your AI Fitness Coach
+          </h1>
+          <p className="text-gray-500 text-sm">
+            Personalized workout guidance powered by AI
+          </p>
         </div>
 
         {/* How it works */}
         <Section icon={Brain} title="How It Works">
           <p className="text-gray-600 text-sm leading-relaxed">
-            Our AI fitness coach analyzes your fitness goals, workout history, and preferences to recommend
-            personalized training programs. The recommendations are designed to help you improve strength,
-            endurance, and overall fitness.
+            Our AI Fitness Coach uses the information you provide, such as your goals,
+            activity history, and workout preferences, to generate personalized fitness
+            recommendations. These suggestions are designed to support your training,
+            but they should not replace professional medical or fitness advice.
           </p>
         </Section>
 
         {/* What the AI uses */}
-        <Section icon={Target} title="What the AI Uses" iconColor="text-blue-600" iconBg="bg-blue-100">
+        <Section
+          icon={Target}
+          title="What the AI Uses"
+          iconColor="text-blue-600"
+          iconBg="bg-blue-100"
+        >
           <div>
             <BulletItem text="Your fitness goals" />
-            <BulletItem text="Selected workouts" />
+            <BulletItem text="Workout selections" />
             <BulletItem text="Training progress" />
-            <BulletItem text="Workout preferences" />
+            <BulletItem text="Exercise preferences" />
           </div>
         </Section>
 
         {/* Privacy */}
-        <Section icon={ShieldCheck} title="Privacy" iconColor="text-green-600" iconBg="bg-green-100">
+        <Section
+          icon={ShieldCheck}
+          title="Privacy"
+          iconColor="text-green-600"
+          iconBg="bg-green-100"
+        >
           <p className="text-gray-600 text-sm leading-relaxed">
-            Your personal data is used only to improve workout recommendations and enhance your training experience.
-            We do not sell or share your data with third parties.
+            We use your data to provide and improve workout recommendations and app
+            features. Your information is handled according to our Privacy Policy.
+            We do not use your personal data for unrelated purposes without your consent.
           </p>
         </Section>
 

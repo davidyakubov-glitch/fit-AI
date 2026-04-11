@@ -1,37 +1,18 @@
 import { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Auth from "./pages/Auth";
-import { listenToAuthChanges, logoutUser } from "./lib/auth";
-
-function WorkoutPage({ user }) {
-  return (
-    <div className="min-h-screen bg-white p-6">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">FitAI Dashboard</h1>
-            <p className="text-gray-500 mt-2">
-              Welcome, {user?.email}
-            </p>
-          </div>
-
-          <button
-            onClick={logoutUser}
-            className="px-4 py-2 rounded-xl bg-black text-white"
-          >
-            Log out
-          </button>
-        </div>
-
-        <div className="p-6 rounded-2xl border bg-gray-50">
-          <h2 className="text-xl font-semibold mb-2">You are logged in</h2>
-          <p className="text-gray-600">
-            Firebase auth works, and this is your protected app screen.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
+import Layout from "./Layout";
+import Workout from "./pages/Workout";
+import ExerciseCatalog from "./pages/ExerciseCatalog";
+import WorkoutPlan from "./pages/WorkoutPlan";
+import Community from "./pages/Community";
+import Progress from "./pages/Progress";
+import Referral from "./pages/Referral";
+import Settings from "./pages/Settings";
+import Nutrition from "./pages/Nutrition";
+import AboutAICoach from "./pages/AboutAICoach";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import { listenToAuthChanges } from "./lib/auth";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -54,9 +35,30 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return <Auth onLoginSuccess={setUser} />;
-  }
-
-  return <WorkoutPage user={user} />;
+  return (
+    <BrowserRouter>
+      {!user ? (
+        <Routes>
+          <Route path="*" element={<Auth onLoginSuccess={setUser} />} />
+        </Routes>
+      ) : (
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Navigate to="/workout" replace />} />
+            <Route path="workout" element={<Workout />} />
+            <Route path="exercisecatalog" element={<ExerciseCatalog />} />
+            <Route path="workoutplan" element={<WorkoutPlan />} />
+            <Route path="community" element={<Community />} />
+            <Route path="progress" element={<Progress />} />
+            <Route path="referral" element={<Referral />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="nutrition" element={<Nutrition />} />
+            <Route path="aboutaicoach" element={<AboutAICoach />} />
+            <Route path="privacypolicy" element={<PrivacyPolicy />} />
+            <Route path="*" element={<Navigate to="/workout" replace />} />
+          </Route>
+        </Routes>
+      )}
+    </BrowserRouter>
+  );
 }

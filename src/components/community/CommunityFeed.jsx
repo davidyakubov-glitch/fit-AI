@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Heart, Globe, Users, Lock, Clock, Dumbbell, Loader2, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
+import { useAuthUser } from '../../lib/useAuthUser';
 
 const privacyIcon = { public: Globe, friends: Users, private: Lock };
 
@@ -31,39 +32,69 @@ function PostCard({ post, currentUser, onLike, onUseTemplate }) {
               {(post.author_name || 'A')[0].toUpperCase()}
             </div>
             <div>
-              <p className="font-semibold text-gray-900 text-sm">{post.author_name || 'Athlete'}</p>
+              <p className="font-semibold text-gray-900 text-sm">
+                {post.author_name || 'Athlete'}
+              </p>
               <p className="text-xs text-gray-400 flex items-center gap-1">
                 <Icon className="h-3 w-3" />
-                {new Date(post.created_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                {new Date(post.created_date).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                })}
               </p>
             </div>
           </div>
-          {isTemplate && <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">Template</Badge>}
+          {isTemplate && (
+            <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+              Template
+            </Badge>
+          )}
         </div>
 
         <div className="mt-3 p-3 bg-gray-50 rounded-xl">
           <p className="font-semibold text-gray-900 text-sm">{post.workout_name}</p>
+
           {post.stats && (
             <div className="flex gap-3 mt-1 flex-wrap">
               {post.stats.exercises_completed != null && (
-                <span className="text-xs text-gray-500 flex items-center gap-1"><Dumbbell className="h-3 w-3" />{post.stats.exercises_completed} exercises</span>
+                <span className="text-xs text-gray-500 flex items-center gap-1">
+                  <Dumbbell className="h-3 w-3" />
+                  {post.stats.exercises_completed} exercises
+                </span>
               )}
+
               {post.stats.total_reps != null && (
-                <span className="text-xs text-gray-500">🔁 {post.stats.total_reps} reps</span>
+                <span className="text-xs text-gray-500">
+                  🔁 {post.stats.total_reps} reps
+                </span>
               )}
+
               {post.stats.duration_seconds && (
-                <span className="text-xs text-gray-500 flex items-center gap-1"><Clock className="h-3 w-3" />{formatDur(post.stats.duration_seconds)}</span>
+                <span className="text-xs text-gray-500 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatDur(post.stats.duration_seconds)}
+                </span>
               )}
-              {post.stats.difficulty && <Badge variant="outline" className="text-xs capitalize">{post.stats.difficulty}</Badge>}
+
+              {post.stats.difficulty && (
+                <Badge variant="outline" className="text-xs capitalize">
+                  {post.stats.difficulty}
+                </Badge>
+              )}
             </div>
           )}
+
           {isTemplate && post.template_exercises && (
             <div className="mt-2 space-y-1">
               {post.template_exercises.slice(0, 3).map((ex, i) => (
-                <p key={i} className="text-xs text-gray-500">{ex.exercise_name} — {ex.sets}×{ex.reps}</p>
+                <p key={i} className="text-xs text-gray-500">
+                  {ex.exercise_name} — {ex.sets}×{ex.reps}
+                </p>
               ))}
               {post.template_exercises.length > 3 && (
-                <p className="text-xs text-gray-400">+{post.template_exercises.length - 3} more</p>
+                <p className="text-xs text-gray-400">
+                  +{post.template_exercises.length - 3} more
+                </p>
               )}
             </div>
           )}
@@ -74,16 +105,27 @@ function PostCard({ post, currentUser, onLike, onUseTemplate }) {
         <div className="mt-3 flex items-center gap-2">
           {currentUser && (
             <button
+              type="button"
               onClick={() => onLike(post)}
-              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all ${liked ? 'text-red-500 bg-red-50' : 'text-gray-500 hover:bg-gray-100'}`}
+              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all ${
+                liked ? 'text-red-500 bg-red-50' : 'text-gray-500 hover:bg-gray-100'
+              }`}
             >
               <Heart className={`h-4 w-4 ${liked ? 'fill-red-500' : ''}`} />
               {(post.likes || []).length}
             </button>
           )}
+
           {isTemplate && currentUser && !isOwn && (
-            <Button size="sm" variant="outline" onClick={() => onUseTemplate(post)} className="text-xs ml-auto">
-              <Download className="h-3 w-3 mr-1" /> Use Template
+            <Button
+              size="sm"
+              variant="outline"
+              type="button"
+              onClick={() => onUseTemplate(post)}
+              className="text-xs ml-auto"
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Use Template
             </Button>
           )}
         </div>
@@ -94,37 +136,41 @@ function PostCard({ post, currentUser, onLike, onUseTemplate }) {
 
 export default function CommunityFeed() {
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState('all'); // all | workout_summary | template_share
+  const [filter, setFilter] = useState('all');
 
-  const { data: user } = useQuery({ queryKey: ['user'], queryFn: () => base44.auth.me().catch(() => null) });
+  const user = useAuthUser();
 
   const { data: posts = [], isLoading } = useQuery({
     queryKey: ['communityFeed'],
-    queryFn: () => base44.entities.WorkoutPost.filter({ privacy: 'public' }, '-created_date', 30)
+    queryFn: () =>
+      base44.entities.WorkoutPost.filter({ privacy: 'public' }, '-created_date', 30),
   });
 
   const likeMutation = useMutation({
     mutationFn: async (post) => {
       const likes = post.likes || [];
       const alreadyLiked = likes.includes(user.email);
-      const newLikes = alreadyLiked ? likes.filter(e => e !== user.email) : [...likes, user.email];
+      const newLikes = alreadyLiked
+        ? likes.filter((e) => e !== user.email)
+        : [...likes, user.email];
+
       return base44.entities.WorkoutPost.update(post.id, { likes: newLikes });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['communityFeed'] })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['communityFeed'] }),
   });
 
   const handleUseTemplate = async (post) => {
     try {
       await base44.entities.StructuredPlan.create({
-        name: post.workout_name + ' (community)',
-        exercises: (post.template_exercises || []).map(ex => ({
+        name: `${post.workout_name} (community)`,
+        exercises: (post.template_exercises || []).map((ex) => ({
           exercise_name: ex.exercise_name,
           sets: ex.sets,
           reps: ex.reps,
-          rest_seconds: ex.rest_seconds
+          rest_seconds: ex.rest_seconds,
         })),
         source: 'custom',
-        is_template: false
+        is_template: false,
       });
       toast.success('Template saved to your plans!');
     } catch {
@@ -132,29 +178,44 @@ export default function CommunityFeed() {
     }
   };
 
-  const filtered = filter === 'all' ? posts : posts.filter(p => p.post_type === filter);
+  const filtered = filter === 'all' ? posts : posts.filter((p) => p.post_type === filter);
 
-  if (isLoading) return (
-    <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-purple-600" /></div>
-  );
+  if (isLoading || user === undefined) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       {!user && (
         <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-center">
           <p className="text-sm text-purple-700">
-            <a href={createPageUrl('Auth')} className="font-semibold underline">Sign in</a> to like posts, share workouts, and join challenges.
+            <a href={createPageUrl('Auth')} className="font-semibold underline">
+              Sign in
+            </a>{' '}
+            to like posts, share workouts, and join challenges.
           </p>
         </div>
       )}
 
-      {/* Filter tabs */}
       <div className="flex gap-2">
-        {[['all', 'All'], ['workout_summary', 'Workouts'], ['template_share', 'Templates']].map(([val, label]) => (
+        {[
+          ['all', 'All'],
+          ['workout_summary', 'Workouts'],
+          ['template_share', 'Templates'],
+        ].map(([val, label]) => (
           <button
             key={val}
+            type="button"
             onClick={() => setFilter(val)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === val ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              filter === val
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
           >
             {label}
           </button>
@@ -168,12 +229,14 @@ export default function CommunityFeed() {
         </div>
       ) : (
         <div className="space-y-4">
-          {filtered.map(post => (
+          {filtered.map((post) => (
             <PostCard
               key={post.id}
               post={post}
               currentUser={user}
-              onLike={post => user ? likeMutation.mutate(post) : toast.info('Sign in to like posts')}
+              onLike={(post) =>
+                user ? likeMutation.mutate(post) : toast.info('Sign in to like posts')
+              }
               onUseTemplate={handleUseTemplate}
             />
           ))}

@@ -2,10 +2,17 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
-import './i18n' // <--- ПРОСТО ДОБАВЬ ЭТУ СТРОКУ
+import './i18n'
+
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+// создаем клиент
+const queryClient = new QueryClient()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </React.StrictMode>,
 )
