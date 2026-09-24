@@ -7,8 +7,8 @@
 
 // Required landmarks per exercise category
 const REQUIRED_FOR_EXERCISE = {
-  lower_body: ['leftShoulder','rightShoulder','leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle'],
-  upper_body: ['leftShoulder','rightShoulder','leftElbow','rightElbow','leftWrist','rightWrist','leftHip','rightHip'],
+  lower_body: ['leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle'],
+  upper_body: ['leftShoulder','rightShoulder','leftElbow','rightElbow','leftWrist','rightWrist'],
   full_body:  ['leftShoulder','rightShoulder','leftElbow','rightElbow','leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle'],
   core:       ['leftShoulder','rightShoulder','leftHip','rightHip','leftKnee','rightKnee'],
   timed:      ['leftShoulder','rightShoulder','leftElbow','rightElbow','leftHip','rightHip','leftAnkle','rightAnkle'],
@@ -29,12 +29,23 @@ export const EXERCISE_CATEGORY = {
   mountain_climber: 'timed',
   burpee:         'full_body',
   wall_sit:       'lower_body',
+  glute_bridge:   'core',
+  single_leg_squat: 'lower_body',
+  barbell_squat:  'lower_body',
+  deadlift:       'full_body',
+  bench_press:    'upper_body',
+  lat_pulldown:   'upper_body',
+  pull_up:        'upper_body',
+  barbell_row:    'upper_body',
+  leg_press:      'lower_body',
+  leg_curl:       'lower_body',
+  leg_extension:  'lower_body',
+  tricep_extension: 'upper_body',
 };
 
-// Minimum visibility per landmark (strict)
-const MIN_VIS = 0.55;
-// Minimum fraction of required landmarks that must pass visibility
-const MIN_PASS_FRACTION = 1.0; // ALL must pass
+const MIN_VIS = 0.22;
+const MIN_CRITICAL_VIS = 0.15;
+const MIN_PASS_FRACTION = 0.45;
 
 function getRequiredLandmarks(exerciseId) {
   const category = EXERCISE_CATEGORY[exerciseId] || 'full_body';
@@ -45,17 +56,34 @@ function getRequiredLandmarks(exerciseId) {
  * Check if the body is too close to the camera / heavily cropped.
  * Uses the ratio of body height to frame height as a proxy.
  */
-function isTooCroppedOrClose(landmarks) {
-  const topY    = Math.min(landmarks.leftShoulder?.y ?? 1, landmarks.rightShoulder?.y ?? 1);
+function isTooCroppedOrClose(landmarks, exerciseId) {
+  const category = EXERCISE_CATEGORY[exerciseId] || 'full_body';
+  if (category === 'upper_body') return false;
+  const topY =
+    category === 'lower_body'
+      ? Math.min(landmarks.leftHip?.y ?? 1, landmarks.rightHip?.y ?? 1)
+      : Math.min(landmarks.leftShoulder?.y ?? 1, landmarks.rightShoulder?.y ?? 1);
   const bottomY = Math.max(landmarks.leftAnkle?.y ?? 0,   landmarks.rightAnkle?.y ?? 0);
   const bodyHeightFraction = bottomY - topY;
 
   // If ankles/hips are missing, we can't judge — flag it
-  if (!landmarks.leftAnkle && !landmarks.rightAnkle) return true;
+  const leftAnkleVisible = (landmarks.leftAnkle?.visibility ?? 0) >= MIN_CRITICAL_VIS;
+  const rightAnkleVisible = (landmarks.rightAnkle?.visibility ?? 0) >= MIN_CRITICAL_VIS;
+  const leftKneeVisible = (landmarks.leftKnee?.visibility ?? 0) >= MIN_CRITICAL_VIS;
+  const rightKneeVisible = (landmarks.rightKnee?.visibility ?? 0) >= MIN_CRITICAL_VIS;
+  const leftHipVisible = (landmarks.leftHip?.visibility ?? 0) >= MIN_CRITICAL_VIS;
+  const rightHipVisible = (landmarks.rightHip?.visibility ?? 0) >= MIN_CRITICAL_VIS;
+
+  if (!leftAnkleVisible && !rightAnkleVisible) {
+    if (category === 'lower_body' && (leftKneeVisible || rightKneeVisible) && (leftHipVisible || rightHipVisible)) {
+      return false;
+    }
+    return true;
+  }
 
   // Body should span at least 50% of frame height and not exceed 95%
   // If < 50%: too far or landmark noise. If > 95%: too close.
-  if (bodyHeightFraction < 0.45) return true;  // too far / partial
+  if (bodyHeightFraction < (category === 'lower_body' ? 0.1 : 0.2)) return true;  // too far / partial
   if (bodyHeightFraction > 0.97) return true;  // too close
 
   return false;
@@ -74,7 +102,7 @@ function isOutOfFrame(landmarks) {
   const maxX = Math.max(...keyX);
 
   // If the torso center is too close to frame edges
-  return minX < 0.03 || maxX > 0.97;
+  return minX < 0.01 || maxX > 0.99;
 }
 
 /**
@@ -119,13 +147,22 @@ export function validatePose(landmarks, exerciseId) {
 
   const required = getRequiredLandmarks(exerciseId);
 
-  // Gate 1: All required landmarks must exist AND be visible
+  // Gate 1: enough required landmarks must exist and be visible.
   const missingOrHidden = required.filter(k => {
     const lm = landmarks[k];
     return !lm || (lm.visibility !== undefined && lm.visibility < MIN_VIS);
   });
 
-  if (missingOrHidden.length > 0) {
+  const visibleCount = required.length - missingOrHidden.length;
+  const passFraction = visibleCount / required.length;
+  const criticalMissing = required
+    .filter((key) => ['leftHip', 'rightHip', 'leftShoulder', 'rightShoulder'].includes(key))
+    .filter((key) => {
+      const lm = landmarks[key];
+      return !lm || (lm.visibility !== undefined && lm.visibility < MIN_CRITICAL_VIS);
+    });
+
+  if (passFraction < MIN_PASS_FRACTION || criticalMissing.length > 0) {
     const needsAnkles = missingOrHidden.some(k => k.includes('nkle'));
     const needsKnees  = missingOrHidden.some(k => k.includes('nee'));
     const needsHips   = missingOrHidden.some(k => k.includes('ip'));
@@ -146,7 +183,7 @@ export function validatePose(landmarks, exerciseId) {
   }
 
   // Gate 2: Frame cropping / too close
-  if (isTooCroppedOrClose(landmarks)) {
+  if (isTooCroppedOrClose(landmarks, exerciseId)) {
     return notAssessable(
       'Step back so your full body fits in the frame.',
       'We need to see your shoulders, hips, knees, and ankles clearly.'
@@ -164,7 +201,13 @@ export function validatePose(landmarks, exerciseId) {
   // Gate 4: Orientation check for standing exercises
   const standingExercises = ['squat','lunge','jump_squat','wall_sit'];
   if (standingExercises.includes(exerciseId)) {
-    if (!isUprightStance(landmarks)) {
+    const hasVerticalCheckPoints =
+      (landmarks.leftShoulder?.visibility ?? 0) >= MIN_CRITICAL_VIS &&
+      (landmarks.rightShoulder?.visibility ?? 0) >= MIN_CRITICAL_VIS &&
+      ((landmarks.leftAnkle?.visibility ?? 0) >= MIN_CRITICAL_VIS ||
+        (landmarks.rightAnkle?.visibility ?? 0) >= MIN_CRITICAL_VIS);
+
+    if (hasVerticalCheckPoints && !isUprightStance(landmarks)) {
       return notAssessable(
         'Stand upright in the starting position.',
         'Feet shoulder-width apart, head aligned with spine, hips level.'

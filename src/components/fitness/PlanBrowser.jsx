@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Dumbbell, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import { PLAN_TEMPLATES } from './planTemplates';
-import ExerciseVideo from './ExerciseVideo';
+import { translateExerciseName, translateExerciseValue } from './exerciseTranslations';
 
 const GOAL_LABELS = {
   muscle_gain: 'Muscle Gain',
@@ -29,6 +30,8 @@ const GOAL_COLORS = {
 };
 
 export default function PlanBrowser({ onSelectPlan, activePlanId }) {
+  const { i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const [expandedId, setExpandedId] = useState(null);
   const [filterGoal, setFilterGoal] = useState('all');
   const [filterDifficulty, setFilterDifficulty] = useState('all');
@@ -65,7 +68,7 @@ export default function PlanBrowser({ onSelectPlan, activePlanId }) {
                 filterDifficulty === d ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-300 text-gray-600 hover:border-gray-500'
               }`}
             >
-              {d === 'all' ? 'All Levels' : d.charAt(0).toUpperCase() + d.slice(1)}
+              {d === 'all' ? translateExerciseValue('All Levels', language) : translateExerciseValue(d, language)}
             </button>
           ))}
         </div>
@@ -87,7 +90,7 @@ export default function PlanBrowser({ onSelectPlan, activePlanId }) {
                     </div>
                     <CardDescription className="text-sm">{plan.description}</CardDescription>
                     <div className="flex gap-2 mt-2 flex-wrap">
-                      <Badge className={DIFFICULTY_COLORS[plan.difficulty]}>{plan.difficulty}</Badge>
+                      <Badge className={DIFFICULTY_COLORS[plan.difficulty]}>{translateExerciseValue(plan.difficulty, language)}</Badge>
                       <Badge className={GOAL_COLORS[plan.goal]}>{GOAL_LABELS[plan.goal]}</Badge>
                       <Badge variant="outline" className="text-xs">
                         <Clock className="h-3 w-3 mr-1" />
@@ -126,7 +129,7 @@ export default function PlanBrowser({ onSelectPlan, activePlanId }) {
                     {plan.exercises.map((ex, i) => (
                       <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                         <div>
-                          <span className="font-medium text-sm">{i + 1}. {ex.exercise_name}</span>
+                          <span className="font-medium text-sm">{i + 1}. {translateExerciseName(ex.exercise_name, language)}</span>
                           {ex.notes && <p className="text-xs text-gray-500 mt-0.5">{ex.notes}</p>}
                         </div>
                         <div className="text-right text-sm ml-4">

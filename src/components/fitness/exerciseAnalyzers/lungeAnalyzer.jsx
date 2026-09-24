@@ -1,7 +1,7 @@
 import { calcAngle, hasLandmarks } from './utils';
 
-const REQUIRED = ['leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle','leftShoulder','rightShoulder'];
-const MIN_VISIBILITY = 0.55;
+const REQUIRED = ['leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle'];
+const MIN_VISIBILITY = 0.28;
 
 function visibilityOk(landmarks) {
   return REQUIRED.every(k => (landmarks[k]?.visibility ?? 1) >= MIN_VISIBILITY);
@@ -26,9 +26,16 @@ export function analyzeLunge(landmarks, state) {
   const frontKnee = Math.min(leftKnee, rightKnee);
   const backKnee  = Math.max(leftKnee, rightKnee);
 
-  const leftBack  = calcAngle(landmarks.leftAnkle,  landmarks.leftHip,  landmarks.leftShoulder);
-  const rightBack = calcAngle(landmarks.rightAnkle, landmarks.rightHip, landmarks.rightShoulder);
-  const avgBack   = (leftBack + rightBack) / 2;
+  const hasShoulders = landmarks.leftShoulder && landmarks.rightShoulder;
+  const leftBack = hasShoulders
+    ? calcAngle(landmarks.leftAnkle, landmarks.leftHip, landmarks.leftShoulder)
+    : null;
+  const rightBack = hasShoulders
+    ? calcAngle(landmarks.rightAnkle, landmarks.rightHip, landmarks.rightShoulder)
+    : null;
+  const avgBack = Number.isFinite(leftBack) && Number.isFinite(rightBack)
+    ? (leftBack + rightBack) / 2
+    : null;
 
   const hipHeightDiff = Math.abs(landmarks.leftHip.y - landmarks.rightHip.y);
 
@@ -69,7 +76,7 @@ export function analyzeLunge(landmarks, state) {
     }
 
     // Torso upright: strict > 65°
-    if (avgBack < 65) {
+    if (avgBack != null && avgBack < 65) {
       issues.push('excessive_lean');
       issueDetails.excessive_lean = {
         severity: avgBack < 45 ? 'high' : 'medium',
@@ -123,7 +130,7 @@ export function analyzeLunge(landmarks, state) {
     metrics: {
       frontKneeAngle: Math.round(frontKnee),
       backKneeAngle: Math.round(backKnee),
-      torsoAngle: Math.round(avgBack),
+      torsoAngle: avgBack == null ? null : Math.round(avgBack),
       formScore,
     }
   };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
@@ -157,6 +157,7 @@ export default function CommunityFeed() {
       return base44.entities.WorkoutPost.update(post.id, { likes: newLikes });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['communityFeed'] }),
+    onError: () => {},
   });
 
   const handleUseTemplate = async (post) => {

@@ -1,23 +1,35 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
+
+const LANGUAGES = [
+  { value: 'en', label: 'EN' },
+  { value: 'ru', label: 'RU' },
+];
 
 export default function LanguageSwitcher() {
   const { i18n } = useTranslation();
-
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'ru' ? 'en' : 'ru';
-    i18n.changeLanguage(newLang);
-  };
+  const currentLanguage = (i18n.resolvedLanguage || i18n.language || 'ru').slice(0, 2);
 
   return (
-    <Button 
-      variant="outline" 
-      size="sm" 
-      onClick={toggleLanguage}
-      className="h-8 w-12 text-[10px] font-bold border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all rounded-full"
-    >
-      {i18n.language.toUpperCase().substring(0, 2)}
-    </Button>
+    <div className="inline-flex rounded-full border border-gray-200 bg-white/90 p-1 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/90">
+      {LANGUAGES.map((language) => {
+        const active = currentLanguage === language.value;
+        return (
+          <button
+            key={language.value}
+            type="button"
+            onClick={() => i18n.changeLanguage(language.value)}
+            className={`min-w-[44px] rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${
+              active
+                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+            }`}
+            aria-pressed={active}
+          >
+            {language.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

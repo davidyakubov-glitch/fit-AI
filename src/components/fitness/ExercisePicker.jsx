@@ -1,29 +1,65 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Home, Dumbbell, ChevronRight, Search } from 'lucide-react';
-import { exerciseDatabase, LOCATIONS, DIFFICULTY, allMuscleGroups } from './exerciseDatabase';
+import { exerciseDatabase, LOCATIONS, allMuscleGroups } from './exerciseDatabase';
+import { translateUiText } from '../AutoTranslator';
+import { localizeExercise, translateExerciseValue, RU_LABELS } from './exerciseTranslations';
 
-const LOCATION_LABELS = { home: 'Home', gym: 'Gym', both: 'Both' };
 const DIFF_COLORS = {
-  beginner:     'bg-green-100 text-green-800 border-green-200',
+  beginner: 'bg-green-100 text-green-800 border-green-200',
   intermediate: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  advanced:     'bg-red-100 text-red-800 border-red-200',
+  advanced: 'bg-red-100 text-red-800 border-red-200',
 };
+
 const LOC_ICONS = { home: Home, gym: Dumbbell, both: Dumbbell };
 
 export default function ExercisePicker({ onSelect, selectedId }) {
+  const { i18n } = useTranslation();
   const [locationFilter, setLocationFilter] = useState('all');
-  const [muscleFilter, setMuscleFilter]     = useState('all');
-  const [diffFilter, setDiffFilter]         = useState('all');
-  const [search, setSearch]                 = useState('');
+  const [muscleFilter, setMuscleFilter] = useState('all');
+  const [diffFilter, setDiffFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
-  const exercises = Object.values(exerciseDatabase).filter(ex => {
+  const language = i18n.resolvedLanguage || i18n.language;
+  const normalizedSearch = search.trim().toLowerCase();
+  const isRussian = String(language).startsWith('ru');
+
+  const exercises = Object.values(exerciseDatabase).filter((ex) => {
     if (locationFilter !== 'all' && ex.location !== locationFilter && ex.location !== LOCATIONS.BOTH) return false;
-    if (muscleFilter  !== 'all' && ex.muscleGroup !== muscleFilter) return false;
-    if (diffFilter    !== 'all' && ex.difficulty  !== diffFilter)   return false;
-    if (search && !ex.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (muscleFilter !== 'all' && ex.muscleGroup !== muscleFilter) return false;
+    if (diffFilter !== 'all' && ex.difficulty !== diffFilter) return false;
+
+    if (normalizedSearch) {
+      const localized = localizeExercise(ex, language);
+      const searchableText = [
+        ex.name,
+        ex.description,
+        ex.muscleGroup,
+        ex.difficulty,
+        ex.location,
+        ...(ex.equipment || []),
+        translateUiText(ex.name, language),
+        translateUiText(ex.description, language),
+        translateUiText(ex.muscleGroup, language),
+        translateUiText(ex.difficulty, language),
+        translateUiText(ex.location, language),
+        ...(ex.equipment || []).map((item) => translateUiText(item, language)),
+        localized.name,
+        localized.description,
+        localized.muscleGroup,
+        localized.difficulty,
+        localized.location,
+        ...(localized.equipment || []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      if (!searchableText.includes(normalizedSearch)) return false;
+    }
+
     return true;
   });
 
@@ -32,25 +68,22 @@ export default function ExercisePicker({ onSelect, selectedId }) {
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Dumbbell className="h-5 w-5 text-purple-600" />
-          Choose Exercise
+          {translateExerciseValue('Choose Exercise', language)}
         </CardTitle>
 
-        {/* Search */}
         <div className="relative mt-2">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search exercises…"
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={translateExerciseValue('Search exercises...', language)}
             className="w-full pl-8 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 dark:bg-gray-800 dark:border-gray-700"
           />
         </div>
 
-        {/* Filters */}
         <div className="space-y-2 mt-3">
-          {/* Location */}
           <div className="flex gap-1.5 flex-wrap">
-            {['all', 'home', 'gym'].map(loc => (
+            {['all', 'home', 'gym'].map((loc) => (
               <button
                 key={loc}
                 onClick={() => setLocationFilter(loc)}
@@ -60,12 +93,11 @@ export default function ExercisePicker({ onSelect, selectedId }) {
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-100'
                 }`}
               >
-                {loc === 'all' ? 'All Locations' : loc}
+                {loc === 'all' ? translateExerciseValue('All Locations', language) : translateExerciseValue(loc, language)}
               </button>
             ))}
           </div>
 
-          {/* Muscle group */}
           <div className="flex gap-1.5 flex-wrap">
             <button
               onClick={() => setMuscleFilter('all')}
@@ -75,9 +107,9 @@ export default function ExercisePicker({ onSelect, selectedId }) {
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-indigo-100'
               }`}
             >
-              All Muscles
+              {translateExerciseValue('All Muscles', language)}
             </button>
-            {allMuscleGroups.map(mg => (
+            {allMuscleGroups.map((mg) => (
               <button
                 key={mg}
                 onClick={() => setMuscleFilter(mg)}
@@ -87,14 +119,13 @@ export default function ExercisePicker({ onSelect, selectedId }) {
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-indigo-100'
                 }`}
               >
-                {mg}
+                {translateExerciseValue(mg, language)}
               </button>
             ))}
           </div>
 
-          {/* Difficulty */}
           <div className="flex gap-1.5 flex-wrap">
-            {['all', 'beginner', 'intermediate', 'advanced'].map(d => (
+            {['all', 'beginner', 'intermediate', 'advanced'].map((d) => (
               <button
                 key={d}
                 onClick={() => setDiffFilter(d)}
@@ -104,7 +135,7 @@ export default function ExercisePicker({ onSelect, selectedId }) {
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-teal-100'
                 }`}
               >
-                {d === 'all' ? 'All Levels' : d}
+                {d === 'all' ? translateExerciseValue('All Levels', language) : translateExerciseValue(d, language)}
               </button>
             ))}
           </div>
@@ -112,11 +143,15 @@ export default function ExercisePicker({ onSelect, selectedId }) {
       </CardHeader>
 
       <CardContent className="pt-0">
-        <p className="text-xs text-gray-400 mb-2">{exercises.length} exercises</p>
+        <p className="text-xs text-gray-400 mb-2">
+          {exercises.length} {isRussian ? RU_LABELS.exercises : 'exercises'}
+        </p>
         <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-          {exercises.map(ex => {
+          {exercises.map((ex) => {
+            const displayExercise = localizeExercise(ex, language);
             const LocIcon = LOC_ICONS[ex.location] || Dumbbell;
             const isSelected = selectedId === ex.id;
+
             return (
               <button
                 key={ex.id}
@@ -131,14 +166,16 @@ export default function ExercisePicker({ onSelect, selectedId }) {
                   <LocIcon className={`h-4 w-4 flex-shrink-0 ${isSelected ? 'text-purple-600' : 'text-gray-400'}`} />
                   <div className="min-w-0">
                     <div className={`text-sm font-medium truncate ${isSelected ? 'text-purple-700 dark:text-purple-300' : 'text-gray-800 dark:text-gray-200'}`}>
-                      {ex.name}
+                      {displayExercise.name}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">{ex.muscleGroup} · {ex.equipment.join(', ')}</div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {displayExercise.muscleGroup} · {displayExercise.equipment.join(', ')}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                   <Badge className={`text-[10px] px-1.5 py-0 border ${DIFF_COLORS[ex.difficulty]}`}>
-                    {ex.difficulty}
+                    {displayExercise.difficulty}
                   </Badge>
                   <ChevronRight className={`h-4 w-4 ${isSelected ? 'text-purple-600' : 'text-gray-300'}`} />
                 </div>
@@ -146,7 +183,9 @@ export default function ExercisePicker({ onSelect, selectedId }) {
             );
           })}
           {exercises.length === 0 && (
-            <div className="text-center py-6 text-sm text-gray-400">No exercises match your filters</div>
+            <div className="text-center py-6 text-sm text-gray-400">
+              {translateExerciseValue('No exercises match your filters', language)}
+            </div>
           )}
         </div>
       </CardContent>

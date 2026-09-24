@@ -18,6 +18,11 @@ import { analyzeShoulderPress } from './shoulderPressAnalyzer';
 import { analyzeBicepCurl }     from './bicepCurlAnalyzer';
 import { analyzeSitup }         from './situpAnalyzer';
 import { analyzeJumpingJack }   from './jumpingJackAnalyzer';
+import {
+  analyzeGenericRep,
+  getGenericInitialState,
+  hasGenericAnalyzer,
+} from './genericRepAnalyzer';
 
 export const EXERCISE_ANALYZERS = {
   squat: {
@@ -87,10 +92,19 @@ export const EXERCISE_ID_MAP = {
   sit_up: 'situp',
   mountain_climber: 'plank', // Plank-derived
   burpee: 'squat',           // Simplified: detect the squat phase
-  jumping_jack: 'jumping_jack'
+  jumping_jack: 'jumping_jack',
+
 };
 
 export function getAnalyzer(exerciseId) {
+  if (hasGenericAnalyzer(exerciseId)) {
+    return {
+      analyze: (lm, state) => analyzeGenericRep(exerciseId, lm, state),
+      initialState: getGenericInitialState(exerciseId),
+      isTimeBased: false,
+    };
+  }
+
   const key = EXERCISE_ID_MAP[exerciseId] || exerciseId;
   return EXERCISE_ANALYZERS[key] || EXERCISE_ANALYZERS.squat; // Default to squat
 }

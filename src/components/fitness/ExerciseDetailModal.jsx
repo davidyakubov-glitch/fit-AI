@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { X, PlayCircle, AlertTriangle, CheckCircle2, Camera, Info, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { EXERCISE_VIDEO_URLS } from './exerciseVideoCatalog';
+import { localizeExercise, translateExerciseValue } from './exerciseTranslations';
 
 const DIFF_COLORS = {
   beginner:     'bg-green-100 text-green-800',
@@ -10,42 +14,19 @@ const DIFF_COLORS = {
   advanced:     'bg-red-100 text-red-800',
 };
 
-// YouTube embeds per exercise ID
-const VIDEO_URLS = {
-  squat:            'https://www.youtube.com/embed/aclHkVaku9U',
-  lunge:            'https://www.youtube.com/embed/L8fvypPrzzs',
-  push_up:          'https://www.youtube.com/embed/IODxDxX7oi4',
-  plank:            'https://www.youtube.com/embed/pSHjTRCQxIw',
-  sit_up:           'https://www.youtube.com/embed/jDwoBqPH0jk',
-  glute_bridge:     'https://www.youtube.com/embed/wPM8icPu6H8',
-  mountain_climber: 'https://www.youtube.com/embed/nmwgirgXLYM',
-  burpee:           'https://www.youtube.com/embed/auBLPXO8Fww',
-  jump_squat:       'https://www.youtube.com/embed/CVaEhXotL7M',
-  single_leg_squat: 'https://www.youtube.com/embed/qDcniqddTeE',
-  barbell_squat:    'https://www.youtube.com/embed/1oed-UmAxFs',
-  deadlift:         'https://www.youtube.com/embed/op9kVnSso6Q',
-  bench_press:      'https://www.youtube.com/embed/SCVCLChPQac',
-  shoulder_press:   'https://www.youtube.com/embed/2yjwXTZQDDI',
-  lat_pulldown:     'https://www.youtube.com/embed/CAwf7n6Luuc',
-  pull_up:          'https://www.youtube.com/embed/eGo4IYlbE5g',
-  barbell_row:      'https://www.youtube.com/embed/FWJR5Ve8bnQ',
-  leg_press:        'https://www.youtube.com/embed/IZxyjW7MPJQ',
-  leg_curl:         'https://www.youtube.com/embed/ELOCsoDSmrg',
-  leg_extension:    'https://www.youtube.com/embed/YyvSfVjQeL0',
-  bicep_curl:       'https://www.youtube.com/embed/ykJmrZ5v0Oo',
-  tricep_extension: 'https://www.youtube.com/embed/nRiJVZDpdL0',
-};
-
 const TABS = ['Overview', 'Steps', 'Mistakes', 'Tips'];
 
 export default function ExerciseDetailModal({ exercise, onClose }) {
+  const { i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
+  const localizedExercise = localizeExercise(exercise, language);
   const [tab, setTab]           = useState('Overview');
   const [showVideo, setShowVideo] = useState(false);
   const [videoError, setVideoError] = useState(false);
-  const rawId = VIDEO_URLS[exercise.id]?.split('/embed/')[1];
+  const rawId = EXERCISE_VIDEO_URLS[exercise.id]?.split('/embed/')[1];
   const videoUrl = rawId
     ? `https://www.youtube-nocookie.com/embed/${rawId}?autoplay=0&modestbranding=1&rel=0&playsinline=1`
-    : VIDEO_URLS[exercise.id];
+    : EXERCISE_VIDEO_URLS[exercise.id];
 
   const phases = exercise.phases ? Object.entries(exercise.phases) : [];
   const mistakes = exercise.mistakes || [];
@@ -61,13 +42,13 @@ export default function ExerciseDetailModal({ exercise, onClose }) {
         {/* Sticky header */}
         <div className="flex items-start justify-between p-4 border-b bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
           <div>
-            <h2 className="text-lg font-bold leading-tight">{exercise.name}</h2>
+            <h2 className="text-lg font-bold leading-tight">{localizedExercise.name}</h2>
             <div className="flex gap-2 mt-1 flex-wrap">
               <Badge className={cn('text-[10px]', DIFF_COLORS[exercise.difficulty])}>
-                {exercise.difficulty}
+                {localizedExercise.difficulty}
               </Badge>
-              <Badge className="bg-white/20 text-white text-[10px]">{exercise.muscleGroup}</Badge>
-              <Badge className="bg-white/20 text-white text-[10px] capitalize">{exercise.location}</Badge>
+              <Badge className="bg-white/20 text-white text-[10px]">{localizedExercise.muscleGroup}</Badge>
+              <Badge className="bg-white/20 text-white text-[10px] capitalize">{localizedExercise.location}</Badge>
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-white/20 transition-colors">
@@ -97,23 +78,31 @@ export default function ExerciseDetailModal({ exercise, onClose }) {
         <div className="overflow-y-auto flex-1 p-4 space-y-4">
           {tab === 'Overview' && (
             <div className="space-y-4">
-              <p className="text-gray-700 text-sm leading-relaxed">{exercise.description}</p>
+              <p className="text-gray-700 text-sm leading-relaxed">{localizedExercise.description}</p>
 
               {/* Camera angle tip */}
               <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <Camera className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <div className="text-xs font-semibold text-blue-800">Best camera angle</div>
-                  <div className="text-xs text-blue-700 mt-0.5">{exercise.cameraAngle}</div>
+                  <div className="text-xs text-blue-700 mt-0.5">{localizedExercise.cameraAngle}</div>
                 </div>
               </div>
+
+              <Button asChild className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <Link to={`/exercise-analysis/${exercise.id}`} onClick={onClose}>
+                  Start AI Analysis
+                </Link>
+              </Button>
 
               {/* Equipment */}
               <div>
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Equipment</div>
                 <div className="flex flex-wrap gap-1.5">
                   {exercise.equipment.map((eq, i) => (
-                    <Badge key={i} variant="outline" className="text-xs capitalize">{eq === 'none' ? 'No equipment' : eq}</Badge>
+                    <Badge key={i} variant="outline" className="text-xs capitalize">
+                      {localizedExercise.equipment[i] || translateExerciseValue(eq === 'none' ? 'No equipment' : eq, language)}
+                    </Badge>
                   ))}
                 </div>
               </div>

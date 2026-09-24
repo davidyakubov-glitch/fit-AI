@@ -1,7 +1,7 @@
 import { calcAngle, hasLandmarks } from './utils';
 
-const REQUIRED = ['leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle','leftShoulder','rightShoulder'];
-const MIN_VISIBILITY = 0.55;
+const REQUIRED = ['leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle'];
+const MIN_VISIBILITY = 0.28;
 
 function visibilityOk(landmarks) {
   return REQUIRED.every(k => (landmarks[k]?.visibility ?? 1) >= MIN_VISIBILITY);
@@ -25,9 +25,16 @@ export function analyzeSquat(landmarks, state) {
   const avgKnee   = (leftKnee + rightKnee) / 2;
   const kneeAsymmetry = Math.abs(leftKnee - rightKnee);
 
-  const leftBack  = calcAngle(landmarks.leftAnkle,  landmarks.leftHip,  landmarks.leftShoulder);
-  const rightBack = calcAngle(landmarks.rightAnkle, landmarks.rightHip, landmarks.rightShoulder);
-  const avgBack   = (leftBack + rightBack) / 2;
+  const hasShoulders = landmarks.leftShoulder && landmarks.rightShoulder;
+  const leftBack = hasShoulders
+    ? calcAngle(landmarks.leftAnkle, landmarks.leftHip, landmarks.leftShoulder)
+    : null;
+  const rightBack = hasShoulders
+    ? calcAngle(landmarks.rightAnkle, landmarks.rightHip, landmarks.rightShoulder)
+    : null;
+  const avgBack = Number.isFinite(leftBack) && Number.isFinite(rightBack)
+    ? (leftBack + rightBack) / 2
+    : null;
 
   const lKX = landmarks.leftKnee.x,  rKX = landmarks.rightKnee.x;
   const lAX = landmarks.leftAnkle.x, rAX = landmarks.rightAnkle.x;
@@ -62,7 +69,7 @@ export function analyzeSquat(landmarks, state) {
     }
 
     // Forward lean: back angle < 60° is excessive
-    if (avgBack < 60) {
+    if (avgBack != null && avgBack < 60) {
       issues.push('excessive_lean');
       issueDetails.excessive_lean = {
         severity: avgBack < 45 ? 'high' : 'medium',
@@ -140,7 +147,7 @@ export function analyzeSquat(landmarks, state) {
     formScore,
     metrics: {
       kneeAngle: Math.round(avgKnee),
-      backAngle: Math.round(avgBack),
+      backAngle: avgBack == null ? null : Math.round(avgBack),
       depth,
       formScore,
       kneeAsymmetry: Math.round(kneeAsymmetry),

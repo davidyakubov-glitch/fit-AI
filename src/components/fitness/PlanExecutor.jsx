@@ -1,21 +1,22 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
-  Play, Square, RotateCcw, ChevronRight, CheckCircle2,
-  Clock, Dumbbell, SkipForward, Pause
+  Play, Square, CheckCircle2,
+  Clock, Dumbbell, SkipForward
 } from 'lucide-react';
 import { toast } from 'sonner';
 import PoseDetector from './PoseDetector';
-import SquatAnalyzer from './SquatAnalyzer';
+import useExerciseAnalyzer from './useExerciseAnalyzer';
 import FeedbackDisplay from './FeedbackDisplay';
 import ExerciseVideo from './ExerciseVideo';
 import { getExercise } from './exerciseDatabase';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { localizeExercise, translateExerciseName } from './exerciseTranslations';
 
 // Rest timer component
 function RestTimer({ seconds, onDone }) {
@@ -38,6 +39,8 @@ function RestTimer({ seconds, onDone }) {
 }
 
 export default function PlanExecutor({ plan, onFinish, onCancel }) {
+  const { i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const [phase, setPhase] = useState('intro'); // intro | exercise | rest | done
   const [exerciseIdx, setExerciseIdx] = useState(0);
   const [setIdx, setSetIdx] = useState(0);
@@ -54,6 +57,7 @@ export default function PlanExecutor({ plan, onFinish, onCancel }) {
 
   const currentExerciseDef = plan.exercises[exerciseIdx];
   const currentExercise = getExercise(currentExerciseDef?.exercise_id);
+  const localizedCurrentExercise = currentExercise ? localizeExercise(currentExercise, language) : null;
   const totalExercises = plan.exercises.length;
   const totalSets = currentExerciseDef?.sets || 1;
   const progressPct = Math.round(((exerciseIdx * totalSets + setIdx) / (totalExercises * totalSets)) * 100);
@@ -70,12 +74,14 @@ export default function PlanExecutor({ plan, onFinish, onCancel }) {
     mutationFn: (data) => base44.entities.StructuredPlan.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['planHistory'] });
-    }
+    },
+    onError: () => {}
   });
 
   const saveSessionMutation = useMutation({
     mutationFn: (data) => base44.entities.WorkoutSession.create(data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workoutSessions'] })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workoutSessions'] }),
+    onError: () => {}
   });
 
   const handlePoseDetected = useCallback((lm) => setLandmarks(lm), []);
@@ -92,9 +98,10 @@ export default function PlanExecutor({ plan, onFinish, onCancel }) {
 
   const handleFeedbackUpdate = useCallback((f) => setFeedback(f), []);
 
-  const { repCount } = SquatAnalyzer({
+  const { repCount } = useExerciseAnalyzer({
+    exerciseId: currentExerciseDef?.exercise_id || 'squat',
     landmarks: isRecording ? landmarks : null,
-    onSquatComplete: handleRepComplete,
+    onRepComplete: handleRepComplete,
     onFeedbackUpdate: handleFeedbackUpdate
   });
 
@@ -115,7 +122,7 @@ export default function PlanExecutor({ plan, onFinish, onCancel }) {
     });
 
     setExerciseLogs(prev => [...prev, {
-      name: currentExerciseDef.exercise_name,
+      name: translateExerciseName(currentExerciseDef.exercise_name, language),
       sets: setIdx + 1,
       reps: sessionData.totalReps,
       formScore: Math.round(formScore)
@@ -139,18 +146,22 @@ export default function PlanExecutor({ plan, onFinish, onCancel }) {
     clearInterval(elapsedRef.current);
     setPhase('done');
     const totalDuration = Math.round((Date.now() - startTimeRef.current) / 1000);
-    await savePlanMutation.mutateAsync({
-      name: plan.name,
-      description: plan.description,
-      goal: plan.goal,
-      difficulty: plan.difficulty,
-      exercises: plan.exercises,
-      source: plan.source || 'preset',
-      completed_date: new Date().toISOString(),
-      exercises_completed: totalExercises,
-      total_reps_completed: exerciseLogs.reduce((s, e) => s + e.reps, 0) + sessionData.totalReps,
-      duration_seconds: totalDuration
-    });
+    try {
+      await savePlanMutation.mutateAsync({
+        name: plan.name,
+        description: plan.description,
+        goal: plan.goal,
+        difficulty: plan.difficulty,
+        exercises: plan.exercises,
+        source: plan.source || 'preset',
+        completed_date: new Date().toISOString(),
+        exercises_completed: totalExercises,
+        total_reps_completed: exerciseLogs.reduce((s, e) => s + e.reps, 0) + sessionData.totalReps,
+        duration_seconds: totalDuration
+      });
+    } catch {
+      // backend unavailable — workout still completes locally
+    }
     toast.success('Workout complete! Great job! 🎉');
   };
 
@@ -189,7 +200,7 @@ export default function PlanExecutor({ plan, onFinish, onCancel }) {
             {plan.exercises.map((ex, i) => (
               <div key={i} className="flex items-center justify-between p-3 bg-white rounded-lg border">
                 <div>
-                  <span className="font-medium">{i + 1}. {ex.exercise_name}</span>
+                  <span className="font-medium">{i + 1}. {translateExerciseName(ex.exercise_name, language)}</span>
                   {ex.notes && <p className="text-xs text-gray-500">{ex.notes}</p>}
                 </div>
                 <Badge variant="outline">{ex.sets} × {ex.reps}</Badge>
@@ -295,8 +306,8 @@ export default function PlanExecutor({ plan, onFinish, onCancel }) {
               <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide">
                 Exercise {exerciseIdx + 1} of {totalExercises}
               </p>
-              <CardTitle className="text-xl mt-1">{currentExerciseDef.exercise_name}</CardTitle>
-              <p className="text-gray-600 text-sm mt-1">{currentExercise?.description}</p>
+              <CardTitle className="text-xl mt-1">{translateExerciseName(currentExerciseDef.exercise_name, language)}</CardTitle>
+              <p className="text-gray-600 text-sm mt-1">{localizedCurrentExercise?.description}</p>
             </div>
             <Badge className="bg-purple-100 text-purple-800">
               Set {setIdx + 1}/{totalSets}
@@ -321,7 +332,7 @@ export default function PlanExecutor({ plan, onFinish, onCancel }) {
               ) : (
                 <div className="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-lg gap-4">
                   {currentExercise && (
-                    <ExerciseVideo exerciseId={currentExercise.id} exerciseName={currentExercise.name} />
+                    <ExerciseVideo exerciseId={currentExercise.id} exerciseName={localizedCurrentExercise.name} />
                   )}
                   <Button onClick={startSet} size="lg" className="bg-green-600 hover:bg-green-700">
                     <Play className="h-5 w-5 mr-2" /> Start Set {setIdx + 1}
@@ -335,7 +346,7 @@ export default function PlanExecutor({ plan, onFinish, onCancel }) {
           <Card className="h-full">
             <CardContent className="pt-4">
               {isRecording && feedback ? (
-                <FeedbackDisplay feedback={feedback} repCount={repCount} sessionData={sessionData} />
+                <FeedbackDisplay feedback={feedback} repCount={repCount} sessionData={sessionData} exerciseId={currentExerciseDef?.exercise_id} />
               ) : (
                 <div className="space-y-3 py-4">
                   <p className="font-semibold text-sm text-gray-800">Form Tips:</p>

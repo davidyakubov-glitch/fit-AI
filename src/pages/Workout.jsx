@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Play, Square, RotateCcw, Sparkles, Video, Info } from 'lucide-react'; // Заменили Lock на Video
 import { toast } from 'sonner';
@@ -17,9 +18,11 @@ import AIWorkoutGenerator from '../components/fitness/AIWorkoutGenerator';
 import SubscriptionCard from '../components/fitness/SubscriptionCard'; 
 import ExercisePicker from '../components/fitness/ExercisePicker';
 import ExerciseVideo from '../components/fitness/ExerciseVideo';
-import { getExercise } from '../components/fitness/exerciseDatabase';
+import { localizeExercise, translateExerciseValue } from '../components/fitness/exerciseTranslations';
 
 export default function Workout() {
+  const { i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const [isActive, setIsActive] = useState(false);
   const [workoutSavedTick, setWorkoutSavedTick] = useState(0);
   const [landmarks, setLandmarks] = useState(null);
@@ -29,11 +32,12 @@ export default function Workout() {
     goodReps: 0,
     depthScores: [],
     allIssues: [],
+    byExercise: {},
   });
   const [currentWorkout, setCurrentWorkout] = useState(null);
   const [showGenerator, setShowGenerator] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
-  const [selectedExercise, setSelectedExercise] = useState(getExercise('squat'));
+  const [showPicker, setShowPicker] = useState(true);
+  const [selectedExercise, setSelectedExercise] = useState(null);
 
   const startTimeRef = useRef(null);
   const queryClient = useQueryClient();
@@ -60,36 +64,69 @@ export default function Workout() {
   }, []);
 
   const handleRepComplete = useCallback((repData) => {
-    setSessionData((prev) => ({
-      totalReps: prev.totalReps + 1,
-      goodReps: prev.goodReps + (repData?.isGoodForm ? 1 : 0),
-      depthScores: [...prev.depthScores, repData?.depth || 0],
-      allIssues: [...prev.allIssues, ...(repData?.issues || [])],
-    }));
+    const exerciseId = repData?.exerciseId || selectedExercise?.id;
+    if (!exerciseId) return;
+    const isGoodForm = Boolean(repData?.isGoodForm);
 
-    if (repData?.isGoodForm) {
+    setSessionData((prev) => {
+      const currentStats = prev.byExercise?.[exerciseId] || {
+        totalReps: 0,
+        goodReps: 0,
+        allIssues: [],
+      };
+
+      return {
+        totalReps: prev.totalReps + 1,
+        goodReps: prev.goodReps + (isGoodForm ? 1 : 0),
+        depthScores: [...prev.depthScores, repData?.depth || 0],
+        allIssues: [...prev.allIssues, ...(repData?.issues || [])],
+        byExercise: {
+          ...(prev.byExercise || {}),
+          [exerciseId]: {
+            totalReps: currentStats.totalReps + 1,
+            goodReps: currentStats.goodReps + (isGoodForm ? 1 : 0),
+            allIssues: [
+              ...(currentStats.allIssues || []),
+              ...(repData?.issues || []),
+            ],
+          },
+        },
+      };
+    });
+
+    if (isGoodForm) {
       toast.success('Great rep! 💪');
     }
-  }, []);
+  }, [selectedExercise?.id]);
 
   const handleFeedbackUpdate = useCallback((newFeedback) => {
     setFeedback(newFeedback);
   }, []);
 
   const startWorkout = () => {
+    if (!selectedExercise) {
+      setShowPicker(true);
+      toast.error('Choose an exercise first so the camera knows what to count.');
+      return;
+    }
+
     setIsActive(true);
+    setLandmarks(null);
+    setFeedback(null);
     startTimeRef.current = Date.now();
     setSessionData({
       totalReps: 0,
       goodReps: 0,
       depthScores: [],
       allIssues: [],
+      byExercise: {},
     });
     toast.success('Workout started! Get into position.');
   };
 
   const stopWorkout = async () => {
     setIsActive(false);
+    setLandmarks(null);
 
     if (sessionData.totalReps === 0) {
       toast.info('No reps recorded');
@@ -114,41 +151,54 @@ export default function Workout() {
 
     const workoutData = {
       date: new Date().toISOString(),
-      exercise_type: selectedExercise?.id || 'squat',
+      exercise_type: selectedExercise?.id,
       total_reps: sessionData.totalReps,
       good_reps: sessionData.goodReps,
       avg_depth_score: Math.round(avgDepth),
       avg_form_score: Math.round(formScore),
       common_issues: commonIssues,
+      exercise_breakdown: sessionData.byExercise,
       duration_seconds: duration,
     };
 
     try {
       await saveSessionMutation.mutateAsync(workoutData);
-      toast.success(`Workout saved! ${sessionData.totalReps} reps completed.`);
-      setWorkoutSavedTick((t) => t + 1);
-    } catch (error) {
-      toast.error('Failed to save workout');
+    } catch {
+      // backend unavailable — still count the session locally
     }
+    toast.success(`Workout done! ${sessionData.totalReps} reps completed.`);
+    setWorkoutSavedTick((t) => t + 1);
   };
 
   const resetWorkout = () => {
+    if (!selectedExercise) {
+      setShowPicker(true);
+      return;
+    }
+
     setSessionData({
       totalReps: 0,
       goodReps: 0,
       depthScores: [],
       allIssues: [],
+      byExercise: {},
     });
     startTimeRef.current = Date.now();
     toast.info('Workout reset');
   };
 
   const { repCount, holdSeconds } = useExerciseAnalyzer({
-    landmarks,
+    landmarks: isActive && selectedExercise ? landmarks : null,
     exerciseId: selectedExercise?.id || 'squat',
     onRepComplete: handleRepComplete,
     onFeedbackUpdate: handleFeedbackUpdate,
   });
+  const currentExerciseId = selectedExercise?.id;
+  const currentExerciseStats = sessionData.byExercise?.[currentExerciseId] || {
+    totalReps: repCount || 0,
+    goodReps: 0,
+  };
+  const localizedSelectedExercise = selectedExercise ? localizeExercise(selectedExercise, language) : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 md:p-8">
@@ -171,10 +221,10 @@ export default function Workout() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-gray-900 dark:text-gray-100">
-                        {selectedExercise.name}
+                        {localizedSelectedExercise.name}
                       </span>
                       <Badge variant="outline" className="text-xs">
-                        {selectedExercise.muscleGroup}
+                        {localizedSelectedExercise.muscleGroup}
                       </Badge>
                       <Badge
                         className={`text-xs capitalize ${
@@ -185,13 +235,13 @@ export default function Workout() {
                             : 'bg-red-100 text-red-800'
                         }`}
                       >
-                        {selectedExercise.difficulty}
+                        {localizedSelectedExercise.difficulty}
                       </Badge>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {(selectedExercise.equipment || [])
-                        .filter((e) => e && e !== 'none')
-                        .join(', ') || 'Bodyweight'}
+                      {(localizedSelectedExercise.equipment || [])
+                        .filter((e) => e && e !== translateExerciseValue('none', language))
+                        .join(', ') || translateExerciseValue('Bodyweight', language)}
                     </p>
                   </div>
                 )}
@@ -203,7 +253,7 @@ export default function Workout() {
                 size="sm"
                 onClick={() => setShowPicker(!showPicker)}
               >
-                {showPicker ? 'Hide' : 'Change Exercise'}
+                {showPicker ? 'Hide list' : selectedExercise ? 'Change Exercise' : 'Choose Exercise'}
               </Button>
             </div>
 
@@ -213,6 +263,16 @@ export default function Workout() {
                 onSelect={(ex) => {
                   setSelectedExercise(ex);
                   setShowPicker(false);
+                  setFeedback(null);
+                  setLandmarks(null);
+                  setSessionData({
+                    totalReps: 0,
+                    goodReps: 0,
+                    depthScores: [],
+                    allIssues: [],
+                    byExercise: {},
+                  });
+                  toast.success(`${localizeExercise(ex, language).name} selected. You can start camera analysis now.`);
                 }}
               />
             )}
@@ -220,8 +280,16 @@ export default function Workout() {
             {selectedExercise && !showPicker && (
               <ExerciseVideo
                 exerciseId={selectedExercise.id}
-                exerciseName={selectedExercise.name}
+                exerciseName={localizedSelectedExercise.name}
               />
+            )}
+
+            {!selectedExercise && !showPicker && (
+              <Card className="border-dashed border-amber-300 bg-amber-50">
+                <CardContent className="py-6 text-center text-sm text-amber-900">
+                  Choose an exercise before starting the camera. The AI will only count reps for the selected movement.
+                </CardContent>
+              </Card>
             )}
           </div>
         )}
@@ -277,7 +345,7 @@ export default function Workout() {
                   >
                     <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="font-medium">{exercise.name}</h4>
+                        <h4 className="font-medium">{translateExerciseValue(exercise.name, language)}</h4>
                         <p className="text-xs text-gray-500">{exercise.target_muscles}</p>
                       </div>
                       <div className="text-right text-sm">
@@ -304,9 +372,10 @@ export default function Workout() {
               onClick={startWorkout}
               size="lg"
               className="bg-green-600 hover:bg-green-700"
+              disabled={!selectedExercise}
             >
               <Play className="h-5 w-5 mr-2" />
-              Start Free Workout
+              {selectedExercise ? 'Start Free Workout' : 'Choose Exercise First'}
             </Button>
           ) : (
             <>
@@ -355,16 +424,19 @@ export default function Workout() {
                     <div className="text-center relative z-10 px-4">
                       <p className="text-white font-semibold text-lg">AI Vision Ready</p>
                       <p className="text-green-200 text-sm mt-1">
-                        AI form analysis is active and free for all users.
+                        {selectedExercise
+                          ? `Ready to count ${localizedSelectedExercise.name}.`
+                          : 'Choose the exercise first so the camera knows what to count.'}
                       </p>
                     </div>
                     <Button
                       type="button"
                       className="bg-green-600 hover:bg-green-700 relative z-10"
                       onClick={startWorkout}
+                      disabled={!selectedExercise}
                     >
                       <Sparkles className="h-4 w-4 mr-2" />
-                      Activate Free AI Analysis
+                      {selectedExercise ? 'Activate Free AI Analysis' : 'Choose Exercise First'}
                     </Button>
                   </div>
                 )}
@@ -385,11 +457,14 @@ export default function Workout() {
                     repCount={repCount}
                     holdSeconds={holdSeconds}
                     sessionData={sessionData}
-                    exerciseId={selectedExercise?.id || 'squat'}
+                    currentExerciseStats={currentExerciseStats}
+                    exerciseId={selectedExercise?.id}
                   />
                 ) : (
                   <p className="text-gray-500 text-center py-8">
-                    Start your workout to see feedback
+                    {selectedExercise
+                      ? 'Start your workout to see feedback'
+                      : 'Choose an exercise to enable rep counting and feedback'}
                   </p>
                 )}
               </CardContent>
@@ -418,7 +493,7 @@ export default function Workout() {
                 <li>Allow camera access when prompted</li>
                 <li>
                   Position so your <strong>full body</strong> is visible (
-                  {selectedExercise?.cameraAngle || 'side view'})
+                  {localizedSelectedExercise?.cameraAngle || 'the recommended angle'})
                 </li>
                 <li>Click "Start Free Workout" and begin moving</li>
                 <li>Follow real-time feedback to improve form</li>

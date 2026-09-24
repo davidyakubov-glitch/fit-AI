@@ -1,14 +1,5 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { Pose } from '@mediapipe/pose';
-import { Camera } from '@mediapipe/camera_utils';
-
-export const calculateAngle = (a, b, c) => {
-  if (!a || !b || !c) return 0;
-  const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
-  let angle = Math.abs(radians * 180 / Math.PI);
-  if (angle > 180) angle = 360 - angle;
-  return angle;
-};
 
 const SKELETON_CONNECTIONS = [
   [0, 4], [0, 1],
@@ -46,18 +37,50 @@ const LANDMARK_MAP = {
   leftHeel:29,rightHeel:30,leftFootIndex:31,rightFootIndex:32
 };
 
-// Joint annotations per exercise: [pointA_idx, vertex_idx, pointC_idx, label, goodRange]
-const ANGLE_ANNOTATIONS = {
-  squat:          [[23,25,27,'L Knee',[80,110]], [24,26,28,'R Knee',[80,110]], [27,23,11,'Back',[60,90]]],
-  lunge:          [[23,25,27,'F Knee',[80,110]], [24,26,28,'B Knee',[120,170]]],
-  pushup:         [[11,13,15,'L Elbow',[60,100]], [12,14,16,'R Elbow',[60,100]]],
-  plank:          [[11,23,27,'L Spine',[165,190]], [12,24,28,'R Spine',[165,190]]],
-  bicep_curl:     [[11,13,15,'L Elbow',[30,65]], [12,14,16,'R Elbow',[30,65]]],
-  shoulder_press: [[11,13,15,'L Elbow',[150,180]], [12,14,16,'R Elbow',[150,180]]],
-  situp:          [[27,23,11,'Torso',[30,90]]],
-  jumping_jack:   [[23,11,13,'L Arm',[120,180]], [24,12,14,'R Arm',[120,180]]],
-  jump_squat:     [[23,25,27,'L Knee',[80,110]], [24,26,28,'R Knee',[80,110]]],
-};
+// Full-body biomechanical annotations: [pointA_idx, vertex_idx, pointC_idx, label, goodRange]
+const FULL_BODY_ANGLE_ANNOTATIONS = [
+  [23, 25, 27, 'L Knee', [70, 180]],
+  [24, 26, 28, 'R Knee', [70, 180]],
+  [11, 23, 25, 'L Hip', [80, 180]],
+  [12, 24, 26, 'R Hip', [80, 180]],
+  [11, 13, 15, 'L Elbow', [45, 180]],
+  [12, 14, 16, 'R Elbow', [45, 180]],
+  [13, 11, 23, 'L Shoulder', [25, 180]],
+  [14, 12, 24, 'R Shoulder', [25, 180]],
+  [11, 23, 27, 'L Back', [145, 180]],
+  [12, 24, 28, 'R Back', [145, 180]],
+  [23, 11, 7, 'L Neck', [145, 180]],
+  [24, 12, 8, 'R Neck', [145, 180]],
+];
+
+const MIN_DRAW_VISIBILITY = 0.35;
+const LANDMARK_SMOOTHING = 0.45;
+const LOW_VISIBILITY_SMOOTHING = 0.22;
+const POSE_LOST_FRAME_LIMIT = 10;
+
+function smoothLandmarks(prevLandmarks, nextLandmarks) {
+  if (!nextLandmarks) return null;
+  if (!prevLandmarks) return nextLandmarks.map((lm) => ({ ...lm }));
+
+  return nextLandmarks.map((landmark, index) => {
+    const previous = prevLandmarks[index];
+    if (!previous) return { ...landmark };
+
+    const visibility = landmark.visibility ?? 1;
+    const alpha = visibility < 0.65 ? LOW_VISIBILITY_SMOOTHING : LANDMARK_SMOOTHING;
+
+    return {
+      ...landmark,
+      x: previous.x * (1 - alpha) + landmark.x * alpha,
+      y: previous.y * (1 - alpha) + landmark.y * alpha,
+      z:
+        typeof landmark.z === 'number' && typeof previous.z === 'number'
+          ? previous.z * (1 - alpha) + landmark.z * alpha
+          : landmark.z,
+      visibility: Math.max(visibility, previous.visibility ?? visibility),
+    };
+  });
+}
 
 function getSegmentColor(start, end, badIdx) {
   if (badIdx.has(start) || badIdx.has(end)) return 'rgba(255,60,60,0.95)';
@@ -67,19 +90,6 @@ function getSegmentColor(start, end, badIdx) {
   return 'rgba(255,100,100,0.85)';
 }
 
-function drawMirroredText(ctx, text, x, y, w, opts = {}) {
-  ctx.save();
-  ctx.scale(-1, 1);
-  ctx.translate(-w, 0);
-  ctx.font = opts.font || 'bold 12px Arial';
-  ctx.fillStyle = opts.color || '#fff';
-  ctx.textAlign = opts.align || 'center';
-  ctx.shadowColor = 'rgba(0,0,0,0.8)';
-  ctx.shadowBlur = 4;
-  ctx.fillText(text, w - x, y);
-  ctx.shadowBlur = 0;
-  ctx.restore();
-}
 
 function drawAngleArc(ctx, rawLandmarks, a, b, c, label, goodRange, w, h) {
   const lmA = rawLandmarks[a];
@@ -139,28 +149,52 @@ function drawAngleArc(ctx, rawLandmarks, a, b, c, label, goodRange, w, h) {
   ctx.textAlign = 'center';
   ctx.shadowColor = 'rgba(0,0,0,0.5)';
   ctx.shadowBlur = 2;
+  ctx.font = 'bold 10px Arial';
+  ctx.fillText(label, mx, ly - 13);
+  ctx.font = 'bold 11px Arial';
   ctx.fillText(`${angle}°`, mx, ly + 4);
   ctx.shadowBlur = 0;
   ctx.restore();
 }
 
-export default function PoseDetector({ onPoseDetected, isActive, feedback, exerciseId }) {
+export default function PoseDetector({ onPoseDetected, isActive, feedback }) {
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
   const poseRef   = useRef(null);
-  const cameraRef = useRef(null);
+  const streamRef = useRef(null);
+  const frameRequestRef = useRef(null);
   const feedbackRef = useRef(feedback);
+  const onPoseDetectedRef = useRef(onPoseDetected);
+  const smoothedLandmarksRef = useRef(null);
+  const processingFrameRef = useRef(false);
+  const stoppedRef = useRef(false);
+  const poseLostFramesRef = useRef(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState(null);
+  const [cameraStatus, setCameraStatus] = useState('Starting camera...');
+  const [retryKey, setRetryKey] = useState(0);
 
   // Keep feedback ref in sync without re-running main effect
   useEffect(() => { feedbackRef.current = feedback; }, [feedback]);
+  useEffect(() => { onPoseDetectedRef.current = onPoseDetected; }, [onPoseDetected]);
 
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive) {
+      setIsLoading(false);
+      setCameraStatus('Camera paused');
+      return undefined;
+    }
+
+    stoppedRef.current = false;
+    processingFrameRef.current = false;
+    smoothedLandmarksRef.current = null;
+    poseLostFramesRef.current = 0;
+    setIsLoading(true);
+    setError(null);
+    setCameraStatus('Starting camera...');
 
     const onResults = (results) => {
-      if (!canvasRef.current || !videoRef.current) return;
+      if (stoppedRef.current || !canvasRef.current || !videoRef.current) return;
       const canvas = canvasRef.current;
       const ctx    = canvas.getContext('2d');
       canvas.width  = videoRef.current.videoWidth  || 640;
@@ -171,6 +205,13 @@ export default function PoseDetector({ onPoseDetected, isActive, feedback, exerc
       ctx.drawImage(results.image, 0, 0, w, h);
 
       if (results.poseLandmarks) {
+        poseLostFramesRef.current = 0;
+        setCameraStatus('Tracking body');
+        const smoothedLandmarks = smoothLandmarks(
+          smoothedLandmarksRef.current,
+          results.poseLandmarks
+        );
+        smoothedLandmarksRef.current = smoothedLandmarks;
         const fb = feedbackRef.current;
 
         // Build set of "bad" landmark indices from current issues
@@ -182,16 +223,11 @@ export default function PoseDetector({ onPoseDetected, isActive, feedback, exerc
           });
         }
 
-        drawSkeleton(ctx, results.poseLandmarks, w, h, badIdx);
+        drawSkeleton(ctx, smoothedLandmarks, w, h, badIdx);
 
-        // Draw angle annotations for the current exercise
-        const exKey = exerciseId || 'squat';
-        const annotations = ANGLE_ANNOTATIONS[exKey] || ANGLE_ANNOTATIONS.squat;
-        if (annotations) {
-          annotations.forEach(([a, b, c, label, goodRange]) => {
-            drawAngleArc(ctx, results.poseLandmarks, a, b, c, label, goodRange, w, h);
-          });
-        }
+        FULL_BODY_ANGLE_ANNOTATIONS.forEach(([a, b, c, label, goodRange]) => {
+          drawAngleArc(ctx, smoothedLandmarks, a, b, c, label, goodRange, w, h);
+        });
 
         // On-canvas coaching text overlay
         if (fb?.message) {
@@ -219,9 +255,16 @@ export default function PoseDetector({ onPoseDetected, isActive, feedback, exerc
         // Build named landmark object
         const named = {};
         for (const [key, idx] of Object.entries(LANDMARK_MAP)) {
-          named[key] = results.poseLandmarks[idx];
+          named[key] = smoothedLandmarks[idx];
         }
-        onPoseDetected?.(named);
+        onPoseDetectedRef.current?.(named);
+      } else {
+        poseLostFramesRef.current += 1;
+        if (poseLostFramesRef.current >= POSE_LOST_FRAME_LIMIT) {
+          smoothedLandmarksRef.current = null;
+          onPoseDetectedRef.current?.(null);
+          setCameraStatus('No body detected');
+        }
       }
     };
 
@@ -235,45 +278,105 @@ export default function PoseDetector({ onPoseDetected, isActive, feedback, exerc
           smoothLandmarks: true,
           enableSegmentation: false,
           smoothSegmentation: false,
-          minDetectionConfidence: 0.5,
-          minTrackingConfidence: 0.5
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.65
         });
         pose.onResults(onResults);
         poseRef.current = pose;
 
-        if (videoRef.current) {
-          const camera = new Camera(videoRef.current, {
-            onFrame: async () => {
-              if (poseRef.current && videoRef.current) {
-                await poseRef.current.send({ image: videoRef.current });
-              }
-            },
-            width: 640,
-            height: 480
-          });
-          await camera.start();
-          cameraRef.current = camera;
-          setIsLoading(false);
+        if (!videoRef.current) return;
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error('Camera is available only on HTTPS or localhost. Open http://127.0.0.1:5173 through USB debugging, not the LAN IP address.');
         }
+
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: 'user',
+            width: { ideal: 960 },
+            height: { ideal: 720 },
+          },
+        });
+
+        if (stoppedRef.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.muted = true;
+        await videoRef.current.play();
+
+        setIsLoading(false);
+        setCameraStatus('Camera ready');
+
+        const processFrame = async () => {
+          if (stoppedRef.current) return;
+
+          if (
+            !processingFrameRef.current &&
+            poseRef.current &&
+            videoRef.current &&
+            videoRef.current.readyState >= 2
+          ) {
+            processingFrameRef.current = true;
+            try {
+              await poseRef.current.send({ image: videoRef.current });
+            } catch (frameError) {
+              console.warn('Pose frame error:', frameError);
+            } finally {
+              processingFrameRef.current = false;
+            }
+          }
+
+          frameRequestRef.current = window.requestAnimationFrame(processFrame);
+        };
+
+        frameRequestRef.current = window.requestAnimationFrame(processFrame);
       } catch (err) {
         console.error('Pose init error:', err);
-        setError('Failed to start camera. Please allow camera access and reload.');
+        const message =
+          err?.name === 'NotAllowedError'
+            ? 'Camera permission was denied. Allow camera access in Chrome settings and try again.'
+            : err?.name === 'NotFoundError'
+              ? 'No camera was found on this device.'
+              : err?.message || 'Failed to start camera. Please allow camera access and try again.';
+        setError(message);
         setIsLoading(false);
       }
     };
 
     initializePose();
     return () => {
-      cameraRef.current?.stop();
+      stoppedRef.current = true;
+      processingFrameRef.current = false;
+      smoothedLandmarksRef.current = null;
+      poseLostFramesRef.current = 0;
+      if (frameRequestRef.current) {
+        window.cancelAnimationFrame(frameRequestRef.current);
+        frameRequestRef.current = null;
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+      }
       poseRef.current?.close();
+      poseRef.current = null;
     };
-  }, [isActive]);
+  }, [isActive, retryKey]);
 
   const drawSkeleton = (ctx, landmarks, w, h, badIdx) => {
     SKELETON_CONNECTIONS.forEach(([s, e]) => {
       const p1 = landmarks[s], p2 = landmarks[e];
       if (!p1 || !p2) return;
-      if ((p1.visibility ?? 1) < 0.3 || (p2.visibility ?? 1) < 0.3) return;
+      if ((p1.visibility ?? 1) < MIN_DRAW_VISIBILITY || (p2.visibility ?? 1) < MIN_DRAW_VISIBILITY) return;
       const color = getSegmentColor(s, e, badIdx);
       ctx.beginPath();
       ctx.strokeStyle = color;
@@ -287,7 +390,7 @@ export default function PoseDetector({ onPoseDetected, isActive, feedback, exerc
     ctx.shadowBlur = 0;
 
     landmarks.forEach((lm, idx) => {
-      if ((lm.visibility ?? 1) < 0.3) return;
+      if ((lm.visibility ?? 1) < MIN_DRAW_VISIBILITY) return;
       const isBad = badIdx.has(idx);
       ctx.beginPath();
       ctx.fillStyle = isBad ? 'rgba(255,60,60,1)' : getSegmentColor(idx, idx, badIdx);
@@ -298,8 +401,20 @@ export default function PoseDetector({ onPoseDetected, isActive, feedback, exerc
 
   if (error) {
     return (
-      <div className="w-full h-96 bg-red-50 rounded-lg flex items-center justify-center p-4 text-center">
+      <div className="w-full h-96 bg-red-50 rounded-lg flex flex-col items-center justify-center gap-3 p-4 text-center">
         <p className="text-red-600">{error}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setIsLoading(true);
+            setCameraStatus('Restarting camera...');
+            setRetryKey((key) => key + 1);
+          }}
+          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+        >
+          Try camera again
+        </button>
       </div>
     );
   }
@@ -309,7 +424,12 @@ export default function PoseDetector({ onPoseDetected, isActive, feedback, exerc
       {isLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 rounded-lg z-10 gap-3">
           <div className="w-8 h-8 border-4 border-purple-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-300 text-sm">Loading pose detection…</p>
+          <p className="text-gray-300 text-sm">{cameraStatus}</p>
+        </div>
+      )}
+      {!isLoading && cameraStatus !== 'Tracking body' && (
+        <div className="absolute top-3 left-3 right-3 z-10 rounded-lg bg-black/70 px-3 py-2 text-center text-xs font-semibold text-white">
+          {cameraStatus}
         </div>
       )}
       <video ref={videoRef} className="hidden" playsInline muted />

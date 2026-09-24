@@ -1,7 +1,7 @@
 import { calcAngle, hasLandmarks } from './utils';
 
 const REQUIRED = ['leftShoulder','rightShoulder','leftElbow','rightElbow','leftWrist','rightWrist','leftHip','rightHip','leftAnkle','rightAnkle'];
-const MIN_VISIBILITY = 0.55;
+const MIN_VISIBILITY = 0.28;
 
 function visibilityOk(landmarks) {
   return REQUIRED.every(k => (landmarks[k]?.visibility ?? 1) >= MIN_VISIBILITY);

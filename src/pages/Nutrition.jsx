@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,6 @@ import {
 import { Plus, Loader2, Settings2, Flame } from 'lucide-react';
 import { format, startOfDay, endOfDay } from 'date-fns';
 
-import CaloriesSummaryCard from '@/components/nutrition/CaloriesSummaryCard';
 import MealSection from '@/components/nutrition/MealSection';
 import MealLogForm from '@/components/nutrition/MealLogForm';
 import CalorieGoalModal from '@/components/nutrition/CalorieGoalModal';

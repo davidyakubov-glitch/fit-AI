@@ -1,4 +1,4 @@
-import { calcAngle, hasLandmarks, dist } from './utils';
+import { calcAngle, hasLandmarks } from './utils';
 
 const REQUIRED = ['leftShoulder','rightShoulder','leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle'];
 

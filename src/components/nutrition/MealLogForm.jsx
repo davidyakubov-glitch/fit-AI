@@ -35,7 +35,8 @@ export default function MealLogForm({ onClose, initialFood = null, defaultMealTy
       queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
       toast.success(isEditing ? 'Meal updated!' : 'Meal logged!');
       onClose?.();
-    }
+    },
+    onError: () => toast.error('Failed to save meal. Check your connection.')
   });
 
   const handleSelectFood = (food) => {

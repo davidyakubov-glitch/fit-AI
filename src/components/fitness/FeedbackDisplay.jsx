@@ -27,6 +27,11 @@ const ISSUES = {
   not_low_enough:       { text: 'Lower to shoulders',     icon: AlertCircle,   color: 'text-yellow-600', bg: 'bg-yellow-50',  border: 'border-yellow-300', p: 6 },
   arms_not_raised:      { text: 'Raise arms fully',       icon: AlertCircle,   color: 'text-blue-600',   bg: 'bg-blue-50',    border: 'border-blue-300',   p: 4 },
   legs_not_spread:      { text: 'Spread legs wider',      icon: AlertCircle,   color: 'text-blue-600',   bg: 'bg-blue-50',    border: 'border-blue-300',   p: 4 },
+  neck_forward:         { text: 'Neck forward',           icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50',  border: 'border-orange-300', p: 9 },
+  spine_not_neutral:    { text: 'Back not neutral',       icon: AlertTriangle, color: 'text-red-600',    bg: 'bg-red-50',     border: 'border-red-300',    p: 10 },
+  knee_asymmetry:       { text: 'Uneven knees',           icon: AlertCircle,   color: 'text-purple-600', bg: 'bg-purple-50',  border: 'border-purple-300', p: 8 },
+  elbow_asymmetry:      { text: 'Uneven elbows',          icon: AlertCircle,   color: 'text-purple-600', bg: 'bg-purple-50',  border: 'border-purple-300', p: 8 },
+  shoulder_asymmetry:   { text: 'Uneven shoulders',       icon: AlertCircle,   color: 'text-purple-600', bg: 'bg-purple-50',  border: 'border-purple-300', p: 8 },
 };
 
 // ─── Score → Status ───────────────────────────────────────────────────────────
@@ -41,14 +46,39 @@ function getStatus(score) {
 // ─── Gauge config per exercise ────────────────────────────────────────────────
 const GAUGE_CONFIG = {
   squat:          { key: 'kneeAngle',      goodMin: 80,  goodMax: 100, label: 'Knee' },
+  barbell_squat:  { key: 'kneeAngle',      goodMin: 75,  goodMax: 105, label: 'Knee' },
+  jump_squat:     { key: 'kneeAngle',      goodMin: 80,  goodMax: 115, label: 'Knee' },
+  single_leg_squat: { key: 'kneeAngle',    goodMin: 60,  goodMax: 115, label: 'Knee' },
   lunge:          { key: 'frontKneeAngle', goodMin: 80,  goodMax: 105, label: 'Front Knee' },
   push_up:        { key: 'elbowAngle',     goodMin: 60,  goodMax: 95,  label: 'Elbow' },
+  pushup:         { key: 'elbowAngle',     goodMin: 60,  goodMax: 95,  label: 'Elbow' },
+  bench_press:    { key: 'elbowAngle',     goodMin: 70,  goodMax: 110, label: 'Elbow' },
   bicep_curl:     { key: 'elbowAngle',     goodMin: 30,  goodMax: 65,  label: 'Elbow (top)' },
+  tricep_extension: { key: 'elbowAngle',   goodMin: 150, goodMax: 180, label: 'Elbow' },
+  lat_pulldown:   { key: 'elbowAngle',     goodMin: 70,  goodMax: 115, label: 'Elbow' },
+  pull_up:        { key: 'elbowAngle',     goodMin: 45,  goodMax: 100, label: 'Elbow' },
+  barbell_row:    { key: 'elbowAngle',     goodMin: 70,  goodMax: 115, label: 'Elbow' },
   shoulder_press: { key: 'elbowAngle',     goodMin: 150, goodMax: 180, label: 'Elbow (press)' },
   plank:          { key: 'spineAngle',     goodMin: 170, goodMax: 185, label: 'Spine' },
+  glute_bridge:   { key: 'spineAngle',     goodMin: 160, goodMax: 185, label: 'Hip Line' },
+  mountain_climber: { key: 'spineAngle',   goodMin: 155, goodMax: 180, label: 'Spine' },
   situp:          { key: 'torsoAngle',     goodMin: 30,  goodMax: 90,  label: 'Torso' },
+  sit_up:         { key: 'torsoAngle',     goodMin: 30,  goodMax: 90,  label: 'Torso' },
+  deadlift:       { key: 'backAngle',      goodMin: 150, goodMax: 180, label: 'Back' },
+  leg_press:      { key: 'kneeAngle',      goodMin: 70,  goodMax: 110, label: 'Knee' },
+  leg_curl:       { key: 'kneeAngle',      goodMin: 60,  goodMax: 95,  label: 'Knee' },
+  leg_extension:  { key: 'kneeAngle',      goodMin: 150, goodMax: 180, label: 'Knee' },
   jumping_jack:   { key: 'armAngle',       goodMin: 120, goodMax: 180, label: 'Arms' },
 };
+
+const BODY_ANGLE_ROWS = [
+  ['Knees', 'leftKneeAngle', 'rightKneeAngle'],
+  ['Hips', 'leftHipAngle', 'rightHipAngle'],
+  ['Elbows', 'leftElbowAngle', 'rightElbowAngle'],
+  ['Shoulders', 'leftShoulderAngle', 'rightShoulderAngle'],
+  ['Back', 'backAngle', 'spineAngle'],
+  ['Neck', 'neckAngle', null],
+];
 
 // ─── Angle Gauge ──────────────────────────────────────────────────────────────
 function AngleGauge({ angle, goodMin, goodMax, label }) {
@@ -117,7 +147,7 @@ function ScoreCard({ score, repFormDegradation }) {
 }
 
 // ─── Rep Counter ─────────────────────────────────────────────────────────────
-function RepCounter({ repCount, goodReps }) {
+function RepCounter({ repCount, goodReps, currentExerciseStats }) {
   const [flash, setFlash] = useState(false);
   const prevCount = useRef(repCount);
 
@@ -130,26 +160,54 @@ function RepCounter({ repCount, goodReps }) {
   }, [repCount]);
 
   const pct = repCount > 0 ? Math.round((goodReps / repCount) * 100) : 0;
+  const exerciseTotal = currentExerciseStats?.totalReps ?? repCount;
+  const exerciseGood = currentExerciseStats?.goodReps ?? goodReps;
+  const exercisePct =
+    exerciseTotal > 0 ? Math.round((exerciseGood / exerciseTotal) * 100) : 0;
 
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <div className={cn(
-        'bg-white rounded-xl border-2 p-3 text-center transition-all duration-300',
-        flash ? 'border-purple-500 bg-purple-50 scale-105' : 'border-gray-200'
-      )}>
-        <div className="text-[10px] text-gray-400 uppercase tracking-wide">Reps</div>
-        <div className={cn('text-3xl font-black leading-tight transition-colors', flash ? 'text-purple-600' : 'text-gray-900')}>
-          {repCount}
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div className={cn(
+          'bg-white rounded-xl border-2 p-3 text-center transition-all duration-300',
+          flash ? 'border-purple-500 bg-purple-50 scale-105' : 'border-gray-200'
+        )}>
+          <div className="text-[10px] text-gray-400 uppercase tracking-wide">Reps</div>
+          <div className={cn('text-3xl font-black leading-tight transition-colors', flash ? 'text-purple-600' : 'text-gray-900')}>
+            {repCount}
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-3 text-center">
+          <div className="text-[10px] text-gray-400 uppercase tracking-wide">Good Form</div>
+          <div className={cn('text-3xl font-black leading-tight', pct >= 80 ? 'text-green-600' : pct >= 50 ? 'text-yellow-600' : 'text-red-500')}>
+            {goodReps ?? 0}
+          </div>
+          {repCount > 0 && (
+            <div className={cn('text-[10px] font-semibold', pct >= 80 ? 'text-green-500' : pct >= 50 ? 'text-yellow-500' : 'text-red-400')}>
+              {pct}%
+            </div>
+          )}
         </div>
       </div>
-      <div className="bg-white rounded-xl border-2 border-gray-200 p-3 text-center">
-        <div className="text-[10px] text-gray-400 uppercase tracking-wide">Good Form</div>
-        <div className={cn('text-3xl font-black leading-tight', pct >= 80 ? 'text-green-600' : pct >= 50 ? 'text-yellow-600' : 'text-red-500')}>
-          {goodReps ?? 0}
+
+      <div className="rounded-xl border bg-gray-50 px-3 py-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-bold uppercase tracking-wide text-gray-400">
+            Current exercise
+          </span>
+          <span className="font-black text-gray-800">
+            {exerciseGood}/{exerciseTotal} clean
+          </span>
         </div>
-        {repCount > 0 && (
-          <div className={cn('text-[10px] font-semibold', pct >= 80 ? 'text-green-500' : pct >= 50 ? 'text-yellow-500' : 'text-red-400')}>
-            {pct}%
+        {exerciseTotal > 0 && (
+          <div className="mt-1 h-2 overflow-hidden rounded-full bg-white">
+            <div
+              className={cn(
+                'h-full rounded-full transition-all duration-500',
+                exercisePct >= 80 ? 'bg-green-500' : exercisePct >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+              )}
+              style={{ width: `${exercisePct}%` }}
+            />
           </div>
         )}
       </div>
@@ -158,7 +216,14 @@ function RepCounter({ repCount, goodReps }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function FeedbackDisplay({ feedback, repCount, holdSeconds, sessionData, exerciseId }) {
+export default function FeedbackDisplay({
+  feedback,
+  repCount,
+  holdSeconds,
+  sessionData,
+  currentExerciseStats,
+  exerciseId,
+}) {
   if (!feedback) return null;
 
   const { issues = [], issueDetails = {}, metrics = {}, message, hint, state, lowConfidence, formScore: rawScore, notAssessable } = feedback;
@@ -238,7 +303,11 @@ export default function FeedbackDisplay({ feedback, repCount, holdSeconds, sessi
             <div className="text-xs text-blue-400">Hold time</div>
           </div>
         ) : (
-          <RepCounter repCount={repCount ?? 0} goodReps={sessionData?.goodReps ?? 0} />
+          <RepCounter
+            repCount={repCount ?? 0}
+            goodReps={currentExerciseStats?.goodReps ?? sessionData?.goodReps ?? 0}
+            currentExerciseStats={currentExerciseStats}
+          />
         )
       )}
 
@@ -256,6 +325,38 @@ export default function FeedbackDisplay({ feedback, repCount, holdSeconds, sessi
             goodMax={gaugeCfg.goodMax}
             label={gaugeCfg.label}
           />
+        </div>
+      )}
+
+      {!notAssessable && !lowConfidence && (
+        <div className="bg-white rounded-xl border p-3 space-y-2">
+          <div className="text-[10px] text-gray-400 uppercase tracking-wide font-bold">
+            Full body angles
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {BODY_ANGLE_ROWS.map(([label, leftKey, rightKey]) => {
+              const left = metrics[leftKey];
+              const right = rightKey ? metrics[rightKey] : null;
+              if (left == null && right == null) return null;
+
+              return (
+                <div key={label} className="rounded-lg bg-gray-50 px-2 py-1.5">
+                  <div className="text-[10px] text-gray-400 font-semibold uppercase">
+                    {label}
+                  </div>
+                  <div className="text-sm font-black text-gray-800">
+                    {rightKey ? (
+                      <>
+                        {left ?? '-'}° / {right ?? '-'}°
+                      </>
+                    ) : (
+                      <>{left ?? '-'}°</>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

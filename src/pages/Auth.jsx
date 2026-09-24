@@ -1,13 +1,16 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Mail, Lock, User } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 import {
   registerUser,
   loginUser,
 } from "../lib/auth";
 
 export default function Auth({ onLoginSuccess }) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,33 +33,33 @@ export default function Auth({ onLoginSuccess }) {
       setLoading(true);
 
       if (!trimmedEmail) {
-        alert("Enter email");
+        alert(t("auth.alert_enter_email"));
         return;
       }
 
       if (mode === "signup") {
         if (!trimmedName) {
-          alert("Enter your name");
+          alert(t("auth.alert_enter_name"));
           return;
         }
 
         if (!password) {
-          alert("Enter password");
+          alert(t("auth.alert_enter_password"));
           return;
         }
 
         if (password.length < 6) {
-          alert("Password must be at least 6 characters");
+          alert(t("auth.alert_password_length"));
           return;
         }
 
         if (password.trim() !== confirmPassword.trim()) {
-          alert("Passwords do not match");
+          alert(t("auth.alert_passwords_no_match"));
           return;
         }
 
         const user = await registerUser(trimmedEmail, password, trimmedName);
-        alert("Account created successfully");
+        alert(t("auth.alert_created"));
         resetFormState();
 
         if (onLoginSuccess) {
@@ -64,12 +67,12 @@ export default function Auth({ onLoginSuccess }) {
         }
       } else if (mode === "login") {
         if (!password) {
-          alert("Enter password");
+          alert(t("auth.alert_enter_password"));
           return;
         }
 
         const user = await loginUser(trimmedEmail, password);
-        alert("Signed in successfully");
+        alert(t("auth.alert_signed_in"));
         resetFormState();
 
         if (onLoginSuccess) {
@@ -77,22 +80,22 @@ export default function Auth({ onLoginSuccess }) {
         }
       } else if (mode === "reset") {
       
-        alert("Password reset is not connected yet");
+        alert(t("auth.alert_reset_not_connected"));
         setMode("login");
       }
     } catch (error) {
       console.error(error);
 
       if (error?.code === "auth/invalid-credential") {
-        alert("Invalid email or password");
+        alert(t("auth.alert_invalid_credentials"));
       } else if (error?.code === "auth/email-already-in-use") {
-        alert("This email is already in use");
+        alert(t("auth.alert_email_in_use"));
       } else if (error?.code === "auth/user-not-found") {
-        alert("User not found");
+        alert(t("auth.alert_user_not_found"));
       } else if (error?.code === "auth/invalid-email") {
-        alert("Invalid email address");
+        alert(t("auth.alert_invalid_email"));
       } else {
-        alert(error?.message || "Something went wrong");
+        alert(error?.message || t("auth.alert_generic_error"));
       }
     } finally {
       setLoading(false);
@@ -101,19 +104,23 @@ export default function Auth({ onLoginSuccess }) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSwitcher />
+      </div>
+
       <div className="w-full max-w-md">
         <Card className="shadow-xl border-0 rounded-2xl">
           <CardHeader className="space-y-2 text-center">
             <CardTitle className="text-2xl font-bold">
-              {mode === "login" && "Sign In"}
-              {mode === "signup" && "Create Account"}
-              {mode === "reset" && "Reset Password"}
+              {mode === "login" && t("sign_in")}
+              {mode === "signup" && t("auth.create_account")}
+              {mode === "reset" && t("auth.reset_password")}
             </CardTitle>
 
             <p className="text-sm text-gray-500">
-              {mode === "login" && "Welcome back"}
-              {mode === "signup" && "Create your FitAI account"}
-              {mode === "reset" && "We will send reset instructions"}
+              {mode === "login" && t("auth.welcome_back")}
+              {mode === "signup" && t("auth.create_your_account")}
+              {mode === "reset" && t("auth.reset_instructions")}
             </p>
           </CardHeader>
 
@@ -122,13 +129,13 @@ export default function Auth({ onLoginSuccess }) {
               {mode === "signup" && (
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700">
-                    Name
+                    {t("auth.name")}
                   </label>
                   <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white">
                     <User className="h-4 w-4 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Your name"
+                      placeholder={t("auth.your_name")}
                       className="w-full outline-none bg-transparent"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -140,13 +147,13 @@ export default function Auth({ onLoginSuccess }) {
 
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700">
-                  Email
+                  {t("auth.email")}
                 </label>
                 <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white">
                   <Mail className="h-4 w-4 text-gray-400" />
                   <input
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder={t("auth.enter_email")}
                     className="w-full outline-none bg-transparent"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -158,13 +165,13 @@ export default function Auth({ onLoginSuccess }) {
               {mode !== "reset" && (
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700">
-                    Password
+                    {t("auth.password")}
                   </label>
                   <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white">
                     <Lock className="h-4 w-4 text-gray-400" />
                     <input
                       type="password"
-                      placeholder="Enter password"
+                      placeholder={t("auth.enter_password")}
                       className="w-full outline-none bg-transparent"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -179,13 +186,13 @@ export default function Auth({ onLoginSuccess }) {
               {mode === "signup" && (
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700">
-                    Confirm Password
+                    {t("auth.confirm_password")}
                   </label>
                   <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white">
                     <Lock className="h-4 w-4 text-gray-400" />
                     <input
                       type="password"
-                      placeholder="Confirm password"
+                      placeholder={t("auth.confirm_password_placeholder")}
                       className="w-full outline-none bg-transparent"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
@@ -202,7 +209,7 @@ export default function Auth({ onLoginSuccess }) {
                     onClick={() => setMode("reset")}
                     className="text-sm text-purple-600 hover:underline"
                   >
-                    Forgot password?
+                    {t("auth.forgot_password")}
                   </button>
                 </div>
               )}
@@ -213,12 +220,12 @@ export default function Auth({ onLoginSuccess }) {
                 disabled={loading}
               >
                 {loading ? (
-                  "Please wait..."
+                  t("auth.please_wait")
                 ) : (
                   <>
-                    {mode === "login" && "Sign In"}
-                    {mode === "signup" && "Create Account"}
-                    {mode === "reset" && "Send Reset Email"}
+                    {mode === "login" && t("sign_in")}
+                    {mode === "signup" && t("auth.create_account")}
+                    {mode === "reset" && t("auth.send_reset_email")}
                   </>
                 )}
               </Button>
@@ -230,19 +237,19 @@ export default function Auth({ onLoginSuccess }) {
                   className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-gray-700"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  Back to Sign In
+                  {t("auth.back_to_sign_in")}
                 </button>
               ) : (
                 <p className="text-center text-sm text-gray-500">
                   {mode === "login"
-                    ? "Don't have an account?"
-                    : "Already have an account?"}{" "}
+                    ? t("auth.no_account")
+                    : t("auth.have_account")}{" "}
                   <button
                     type="button"
                     onClick={() => setMode(mode === "login" ? "signup" : "login")}
                     className="text-purple-600 font-semibold hover:underline"
                   >
-                    {mode === "login" ? "Sign up free" : "Sign in"}
+                    {mode === "login" ? t("auth.sign_up_free") : t("auth.sign_in_short")}
                   </button>
                 </p>
               )}
